@@ -23,13 +23,30 @@ public sealed class ProtocolTests
     }
 
     [Fact]
-    public void UnsupportedImageElementIsRejectedExplicitly()
+    public void ScaledScrollingTextTransitionAndEasingRoundTrip()
     {
-        var image = new FrameBuffer(1, 1);
+        var font = new FontProfile("3x5", 3, 5, 0, new Dictionary<char, ulong> { ['A'] = 0b111_101_111_101_101, ['?'] = 0 });
+        var source = new Scene(Guid.NewGuid(), "Semántica", 16, 8, TimeSpan.FromSeconds(3),
+            [new("texto", [new TextElement("A", 16, 1, new(255, 0, 0), font, 1, 6, 7, true, TimeSpan.FromSeconds(3))])],
+            animations: [new(AnimationKind.Wipe, TimeSpan.FromSeconds(2), repeat: true, easing: EasingKind.EaseInOut)],
+            transition: new(TransitionKind.Slide, TimeSpan.FromMilliseconds(500), EasingKind.EaseOut));
+        var decoded = SceneProtocolCodec.Decode(SceneProtocolCodec.Encode(source));
+        var text = Assert.IsType<TextElement>(decoded.Layers[0].Elements[0]);
+        Assert.Equal((6, 7, true), (text.OutputGlyphWidth, text.OutputGlyphHeight, text.Scroll));
+        Assert.Equal(source.Transition, decoded.Transition);
+        Assert.Equal(EasingKind.EaseInOut, decoded.Animations[0].Easing);
+    }
+
+    [Fact]
+    public void ImageElementRoundTripsSemantically()
+    {
+        var image = new FrameBuffer(1, 1); image[0, 0] = new(12, 34, 56);
         var scene = new Scene(Guid.NewGuid(), "Imagen", 1, 1, TimeSpan.FromSeconds(1),
             [new("image", [new ImageElement(0, 0, image)])]);
-        var exception = Assert.Throws<ProtocolException>(() => SceneProtocolCodec.Encode(scene));
-        Assert.Contains("not supported", exception.Message);
+        var decoded = SceneProtocolCodec.Decode(SceneProtocolCodec.Encode(scene));
+        var rendered = SceneEngine.Render(decoded, TimeSpan.Zero);
+        Assert.IsType<ImageElement>(decoded.Layers[0].Elements[0]);
+        Assert.Equal(new Pixel(12, 34, 56), rendered[0, 0]);
     }
 
     [Fact]

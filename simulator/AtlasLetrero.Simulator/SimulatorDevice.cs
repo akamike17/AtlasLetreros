@@ -6,12 +6,15 @@ namespace AtlasLetrero.Simulator;
 
 public sealed class SimulatorDevice
 {
-    private readonly MemorySceneStore _store = new();
+    private readonly ISceneStore _store;
     private ControllerRuntime _runtime;
+    private CancellationTokenSource? _playbackCancellation;
+    private Task? _playbackTask;
 
-    public SimulatorDevice(DeviceConfiguration configuration)
+    public SimulatorDevice(DeviceConfiguration configuration, ISceneStore? store = null)
     {
         Configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+        _store = store ?? new MemorySceneStore();
         Driver = new VirtualDisplayDriver();
         _runtime = new(Driver, _store);
     }
@@ -21,8 +24,11 @@ public sealed class SimulatorDevice
     public RuntimeStatus Status => _runtime.Status;
     public VirtualDisplaySnapshot Snapshot => Driver.CreateSnapshot();
 
-    public async ValueTask BootAsync(CancellationToken cancellationToken = default) =>
+    public async ValueTask BootAsync(CancellationToken cancellationToken = default)
+    {
         await _runtime.BootAsync(Configuration, cancellationToken);
+        if (_runtime.Status.IsPlaying) StartPlaybackLoop();
+    }
 
     public CapabilitiesResponse GetCapabilities() => new(ProtocolVersions.Current, Configuration.DeviceId,
         Configuration.Topology.Width, Configuration.Topology.Height,
@@ -40,11 +46,13 @@ public sealed class SimulatorDevice
     {
         ProtocolJson.ValidateVersion(request.ProtocolVersion);
         await _runtime.PlayAsync(request.SceneId, cancellationToken);
+        StartPlaybackLoop();
     }
 
     public async ValueTask StopAsync(StopRequest request, CancellationToken cancellationToken = default)
     {
         ProtocolJson.ValidateVersion(request.ProtocolVersion);
+        await StopPlaybackLoopAsync();
         await _runtime.StopAsync(cancellationToken);
     }
 
@@ -66,9 +74,45 @@ public sealed class SimulatorDevice
 
     public async ValueTask RestartAsync(CancellationToken cancellationToken = default)
     {
+        await StopPlaybackLoopAsync();
         Driver = new VirtualDisplayDriver();
         _runtime = new(Driver, _store);
-        await _runtime.BootAsync(Configuration, cancellationToken);
+        await BootAsync(cancellationToken);
+    }
+
+    private void StartPlaybackLoop()
+    {
+        _playbackCancellation?.Cancel();
+        _playbackCancellation?.Dispose();
+        _playbackCancellation = new();
+        var token = _playbackCancellation.Token;
+        _playbackTask = Task.Run(async () =>
+        {
+            var started = TimeProvider.System.GetTimestamp();
+            using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(1000d / Math.Min(30, Driver.Capabilities.MaxFramesPerSecond)));
+            try
+            {
+                while (await timer.WaitForNextTickAsync(token))
+                {
+                    var elapsed = TimeProvider.System.GetElapsedTime(started);
+                    if (!_runtime.ActiveRepeats && elapsed >= _runtime.ActiveDuration)
+                    {
+                        await _runtime.StopAsync(token);
+                        break;
+                    }
+                    await _runtime.RenderAsync(elapsed, token);
+                }
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        }, token);
+    }
+
+    private async Task StopPlaybackLoopAsync()
+    {
+        if (_playbackCancellation is null) return;
+        await _playbackCancellation.CancelAsync();
+        if (_playbackTask is not null) try { await _playbackTask; } catch (OperationCanceledException) { }
+        _playbackCancellation.Dispose(); _playbackCancellation = null; _playbackTask = null;
     }
 
     private void ValidateDimensions(int width, int height, ColorModel colorModel)

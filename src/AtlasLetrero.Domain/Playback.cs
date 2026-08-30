@@ -93,17 +93,29 @@ public sealed record FontProfile
     }
 }
 
-public sealed record TextElement(string Text, int X, int Y, Pixel Color, FontProfile Font, int LetterSpacing = 0) : ISceneElement
+public sealed record TextElement(string Text, int X, int Y, Pixel Color, FontProfile Font, int LetterSpacing = 0,
+    int? OutputGlyphWidth = null, int? OutputGlyphHeight = null, bool Scroll = false, TimeSpan? ScrollPeriod = null) : ISceneElement
 {
     public void Render(FrameBuffer target, TimeSpan position)
     {
         if (string.IsNullOrEmpty(Text)) return;
-        var cursor = X;
+        var width = OutputGlyphWidth ?? Font.GlyphWidth;
+        var height = OutputGlyphHeight ?? Font.GlyphHeight;
+        var origin = X;
+        if (Scroll)
+        {
+            var period = ScrollPeriod.GetValueOrDefault(TimeSpan.FromSeconds(1));
+            var contentWidth = Text.Length * (width + Font.Spacing + LetterSpacing);
+            var distance = Math.Max(1, contentWidth + target.Width);
+            origin -= (int)Math.Floor(position.TotalMilliseconds % period.TotalMilliseconds / period.TotalMilliseconds * distance);
+        }
+        var cursor = origin;
         foreach (var character in Text)
         {
-            for (var y = 0; y < Font.GlyphHeight; y++) for (var x = 0; x < Font.GlyphWidth; x++)
-                if (Font.IsPixelSet(character, x, y)) target.TrySetPixel(cursor + x, Y + y, Color);
-            cursor += Font.GlyphWidth + Font.Spacing + LetterSpacing;
+            for (var y = 0; y < height; y++) for (var x = 0; x < width; x++)
+                if (Font.IsPixelSet(character, x * Font.GlyphWidth / width, y * Font.GlyphHeight / height))
+                    target.TrySetPixel(cursor + x, Y + y, Color);
+            cursor += width + Font.Spacing + LetterSpacing;
         }
     }
 }

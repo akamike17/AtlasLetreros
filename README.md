@@ -4,18 +4,20 @@ Plataforma local para diseñar, simular, almacenar y reproducir letreros LED com
 
 ## Estado V1
 
-El flujo simulado completo está implementado: diseño con texto y animación, protocolo, preview, mapping, envío, persistencia, desconexión del host, reinicio y recuperación píxel por píxel. El firmware portable compila y prueba drivers, API, provisioning, energía, playlists, seguridad, OTA y recovery.
+La V1 simulada permanece en validación. El editor web ya trabaja con proyectos múltiples durables en IndexedDB, objetos editables, fuentes bitmap determinísticas, imágenes no destructivas con fit/crop/transparencia, canvas lógico dinámico, preview local, easing/transiciones, historial y una salida separada del simulador. El envío usa `SceneDocument`: conserva capas y elementos semánticos de texto, imagen y formas en lugar de reducir todo a un framebuffer. Las escenas se guardan atómicamente en `.runtime/scenes`; el runtime tiene reloj limitado a 30 FPS y conserva explícitamente el estado playing/stopped entre reinicios.
 
-Pendiente para prototipo físico: adaptadores ESP-IDF concretos, composición de `app_main`, build/flash ESP32 o ESP32-S3 y certificación HIL. Nada se declara certificado sólo por compilar o estar soportado por una librería.
+La suite distingue pruebas .NET de pruebas Browser E2E y levanta un proceso ASP.NET real. El prototipo físico, HIL y la certificación de hardware siguen fuera del cierre simulado.
 
 ## Inicio rápido
 
-Requisitos: .NET 8 SDK. MySQL es opcional para las pruebas de infraestructura; la aplicación web actual usa el simulador local.
+Requisitos: .NET 8 SDK. Node.js sólo es necesario para Browser E2E. MySQL es opcional para las pruebas de infraestructura; la aplicación web actual usa el simulador local.
 
 ```powershell
 dotnet restore .\AtlasLetreros.slnx
 dotnet test .\AtlasLetreros.slnx --configuration Release
 dotnet run --project .\AtlasLetreros.csproj
+npm install
+npm run test:e2e
 ```
 
 Abrir la dirección local indicada por ASP.NET Core. No guardar contraseñas en `appsettings.json`; usar variables de entorno, secretos de desarrollo o `appsettings.Local.json` ignorado por Git.

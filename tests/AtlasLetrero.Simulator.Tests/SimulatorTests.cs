@@ -84,6 +84,35 @@ public sealed class SimulatorTests
         Assert.Contains("simulator", capabilities.Features);
     }
 
+    [Fact]
+    public async Task PlaybackStopsAtSceneDurationWhenItDoesNotRepeat()
+    {
+        var device = Device(); await device.BootAsync();
+        var scene = new Scene(Guid.NewGuid(), "Una vez", 4, 2, TimeSpan.FromMilliseconds(80),
+            [new("content", [new PixelElement(0, 0, new(255, 0, 0))])]);
+        await device.UploadSceneAsync(SceneProtocolCodec.Encode(scene));
+        await device.PlayAsync(new(1, scene.Id));
+        await Task.Delay(180);
+        Assert.False(device.Status.IsPlaying);
+        Assert.Null(device.Status.ActiveSceneId);
+        Assert.All(device.Snapshot.Pixels, pixel => Assert.False(pixel.IsOn));
+    }
+
+    [Fact]
+    public async Task RepeatingSceneKeepsPlayingBeyondDuration()
+    {
+        var device = Device(); await device.BootAsync();
+        var scene = new Scene(Guid.NewGuid(), "Repetir", 4, 2, TimeSpan.FromMilliseconds(80),
+            [new("content", [new PixelElement(0, 0, new(255, 0, 0))])],
+            animations: [new(AnimationKind.Frame, TimeSpan.FromMilliseconds(80), repeat: true)]);
+        await device.UploadSceneAsync(SceneProtocolCodec.Encode(scene));
+        await device.PlayAsync(new(1, scene.Id));
+        await Task.Delay(180);
+        Assert.True(device.Status.IsPlaying);
+        Assert.Equal(scene.Id, device.Status.ActiveSceneId);
+        await device.StopAsync(new(1));
+    }
+
     private static SimulatorDevice Device()
     {
         var topology = new MatrixTopology(4, 2,

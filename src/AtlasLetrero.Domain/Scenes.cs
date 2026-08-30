@@ -1,19 +1,34 @@
 namespace AtlasLetrero.Domain;
 
 public enum AnimationKind { Blink, Fade, Scroll, Slide, Zoom, Pulse, Wipe, Marquee, Frame }
+public enum EasingKind { Linear, EaseIn, EaseOut, EaseInOut }
+public sealed record SceneTransition
+{
+    public SceneTransition(TransitionKind kind, TimeSpan duration, EasingKind easing = EasingKind.Linear)
+    {
+        if (duration <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(duration));
+        if (!Enum.IsDefined(kind) || !Enum.IsDefined(easing)) throw new ArgumentOutOfRangeException(nameof(kind));
+        Kind = kind; Duration = duration; Easing = easing;
+    }
+    public TransitionKind Kind { get; }
+    public TimeSpan Duration { get; }
+    public EasingKind Easing { get; }
+}
 
 public sealed record Animation
 {
-    public Animation(AnimationKind kind, TimeSpan duration, double speed = 1, bool repeat = false)
+    public Animation(AnimationKind kind, TimeSpan duration, double speed = 1, bool repeat = false, EasingKind easing = EasingKind.Linear)
     {
         if (duration <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(duration));
         if (speed <= 0 || double.IsNaN(speed)) throw new ArgumentOutOfRangeException(nameof(speed));
-        Kind = kind; Duration = duration; Speed = speed; Repeat = repeat;
+        if (!Enum.IsDefined(easing)) throw new ArgumentOutOfRangeException(nameof(easing));
+        Kind = kind; Duration = duration; Speed = speed; Repeat = repeat; Easing = easing;
     }
     public AnimationKind Kind { get; }
     public TimeSpan Duration { get; }
     public double Speed { get; }
     public bool Repeat { get; }
+    public EasingKind Easing { get; }
 }
 
 public interface ISceneElement
@@ -49,6 +64,7 @@ public sealed class ImageElement : ISceneElement
     public int X { get; }
     public int Y { get; }
     public bool TransparentOff { get; }
+    public FrameBuffer Image => _image.Clone();
     public void Render(FrameBuffer target, TimeSpan position) =>
         target.CopyFrom(_image, 0, 0, _image.Width, _image.Height, X, Y, TransparentOff);
 }
@@ -58,13 +74,13 @@ public sealed record Layer(string Name, IReadOnlyList<ISceneElement> Elements, b
 public sealed class Scene
 {
     public Scene(Guid id, string name, int width, int height, TimeSpan duration, IEnumerable<Layer> layers,
-        ColorModel colorModel = ColorModel.Rgb, IEnumerable<Animation>? animations = null)
+        ColorModel colorModel = ColorModel.Rgb, IEnumerable<Animation>? animations = null, SceneTransition? transition = null)
     {
         if (id == Guid.Empty) throw new ArgumentException("Scene identity is required.", nameof(id));
         if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Scene name is required.", nameof(name));
         if (width <= 0 || height <= 0 || duration <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(width));
         Id = id; Name = name.Trim(); Width = width; Height = height; Duration = duration;
-        Layers = layers.ToArray(); ColorModel = colorModel; Animations = animations?.ToArray() ?? [];
+        Layers = layers.ToArray(); ColorModel = colorModel; Animations = animations?.ToArray() ?? []; Transition = transition;
     }
     public Guid Id { get; }
     public string Name { get; }
@@ -74,6 +90,7 @@ public sealed class Scene
     public ColorModel ColorModel { get; }
     public IReadOnlyList<Layer> Layers { get; }
     public IReadOnlyList<Animation> Animations { get; }
+    public SceneTransition? Transition { get; }
 }
 
 public static class SceneEngine
@@ -85,6 +102,11 @@ public static class SceneEngine
         foreach (var layer in scene.Layers)
             if (layer.Visible)
                 foreach (var element in layer.Elements) element.Render(frame, normalized);
+        if (scene.Transition is { } transition && normalized < transition.Duration)
+        {
+            var progress = Ease(normalized.TotalMilliseconds / transition.Duration.TotalMilliseconds, transition.Easing);
+            frame = Transition(EmptyLike(frame), frame, transition.Kind, progress);
+        }
         foreach (var animation in scene.Animations) frame = Apply(frame, animation, normalized);
         frame.SetBrightness((byte)((frame.Brightness * brightness + 127) / 255));
         return frame;
@@ -131,7 +153,20 @@ public static class SceneEngine
     {
         var scaled = position.TotalMilliseconds * animation.Speed;
         var duration = animation.Duration.TotalMilliseconds;
-        return animation.Repeat ? (scaled % duration) / duration : Math.Clamp(scaled / duration, 0, 1);
+        var progress = animation.Repeat ? (scaled % duration) / duration : Math.Clamp(scaled / duration, 0, 1);
+        return Ease(progress, animation.Easing);
+    }
+
+    private static double Ease(double progress, EasingKind easing)
+    {
+        progress = Math.Clamp(progress, 0, 1);
+        return easing switch
+        {
+            EasingKind.EaseIn => progress * progress,
+            EasingKind.EaseOut => 1 - (1 - progress) * (1 - progress),
+            EasingKind.EaseInOut => progress < .5 ? 2 * progress * progress : 1 - Math.Pow(-2 * progress + 2, 2) / 2,
+            _ => progress
+        };
     }
 
     private static FrameBuffer WithBrightness(FrameBuffer source, double factor)

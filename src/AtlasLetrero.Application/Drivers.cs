@@ -55,7 +55,8 @@ public interface ISceneStore
     ValueTask<Guid?> LoadActiveSceneIdAsync(CancellationToken cancellationToken = default);
 }
 
-public sealed record RuntimeStatus(bool IsPlaying, Guid? ActiveSceneId, byte Brightness, string? LastError);
+public sealed record RuntimeStatus(bool IsPlaying, Guid? ActiveSceneId, byte Brightness, string? LastError,
+    string? ActiveSceneName = null, double PositionSeconds = 0);
 
 public sealed class ControllerRuntime
 {
@@ -66,7 +67,10 @@ public sealed class ControllerRuntime
     private byte _brightness = 255;
 
     public ControllerRuntime(IDisplayDriver driver, ISceneStore store) { _driver = driver; _store = store; }
-    public RuntimeStatus Status => new(_playing, _activeScene?.Id, _brightness, null);
+    private TimeSpan _position;
+    public RuntimeStatus Status => new(_playing, _activeScene?.Id, _brightness, null, _activeScene?.Name, _position.TotalSeconds);
+    public TimeSpan ActiveDuration => _activeScene?.Duration ?? TimeSpan.Zero;
+    public bool ActiveRepeats => _activeScene?.Animations.Any(animation => animation.Repeat) == true;
 
     public async ValueTask BootAsync(DeviceConfiguration configuration, CancellationToken cancellationToken = default)
     {
@@ -82,6 +86,7 @@ public sealed class ControllerRuntime
         {
             _activeScene = scene;
             _playing = true;
+            _position = TimeSpan.Zero;
             await RenderAsync(TimeSpan.Zero, cancellationToken);
         }
     }
@@ -93,6 +98,7 @@ public sealed class ControllerRuntime
     {
         _activeScene = await _store.LoadAsync(sceneId, cancellationToken) ?? throw new KeyNotFoundException("Scene is not stored.");
         _playing = true;
+        _position = TimeSpan.Zero;
         await _store.SaveActiveSceneIdAsync(sceneId, cancellationToken);
         await RenderAsync(TimeSpan.Zero, cancellationToken);
     }
@@ -100,6 +106,9 @@ public sealed class ControllerRuntime
     public async ValueTask StopAsync(CancellationToken cancellationToken = default)
     {
         _playing = false;
+        _position = TimeSpan.Zero;
+        _activeScene = null;
+        await _store.SaveActiveSceneIdAsync(null, cancellationToken);
         await _driver.ClearAsync(cancellationToken);
     }
 
@@ -113,6 +122,7 @@ public sealed class ControllerRuntime
     public async ValueTask RenderAsync(TimeSpan position, CancellationToken cancellationToken = default)
     {
         if (!_playing || _activeScene is null) return;
+        _position = position;
         await _driver.RenderAsync(SceneEngine.Render(_activeScene, position, _brightness), cancellationToken);
     }
 }

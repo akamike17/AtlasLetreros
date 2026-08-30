@@ -63,6 +63,19 @@ public sealed class SceneEngineTests
         Assert.Equal(new Pixel(255, 0, 0), frame[2, 2]);
     }
 
+    [Theory]
+    [InlineData(EasingKind.Linear, 2)]
+    [InlineData(EasingKind.EaseIn, 1)]
+    [InlineData(EasingKind.EaseOut, 3)]
+    [InlineData(EasingKind.EaseInOut, 2)]
+    public void EasingProducesGoldenWipeFrame(EasingKind easing, int visiblePixels)
+    {
+        var scene = Scene([new RectangleElement(0, 0, 4, 1, new(255, 0, 0), true)],
+            new(AnimationKind.Wipe, TimeSpan.FromSeconds(1), easing: easing));
+        var frame = SceneEngine.Render(scene, TimeSpan.FromMilliseconds(500));
+        Assert.Equal(visiblePixels, frame.Pixels.ToArray().Count(pixel => pixel != Pixel.Off));
+    }
+
     private static Scene Scene(IReadOnlyList<ISceneElement> elements, Animation? animation = null) =>
         new(Guid.NewGuid(), "Escena", 4, 4, TimeSpan.FromSeconds(10), [new("contenido", elements)],
             animations: animation is null ? [] : [animation]);

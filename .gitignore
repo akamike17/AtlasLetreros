@@ -6,5 +6,9 @@ appsettings.Local.json
 .env
 secrets.json
 .runtime/
+node_modules/
+test-results/
+.browser-run.out
+.browser-run.err
 firmware/**/build*/
 firmware/**/wokwi.vcd

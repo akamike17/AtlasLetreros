@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.DataProtection;
 using AtlasLetrero.Application;
 using AtlasLetrero.Domain;
 using AtlasLetrero.Simulator;
+using AtlasLetrero.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Logging.ClearProviders();
@@ -14,7 +15,8 @@ builder.Services.AddDataProtection().PersistKeysToFileSystem(keyDirectory);
 builder.Services.AddControllersWithViews();
 var topology = new MatrixTopology(32, 16,
     [new MatrixTile(0, 0, 32, 16, Layout: MatrixLayout.Serpentine)], ChannelOrder.Grb);
-var simulator = new SimulatorDevice(new DeviceConfiguration("atlas-simulator", topology, 184));
+var sceneDirectory = Path.Combine(builder.Environment.ContentRootPath, ".runtime", "scenes");
+var simulator = new SimulatorDevice(new DeviceConfiguration("atlas-simulator", topology, 184), new AtomicFileSceneStore(sceneDirectory));
 await simulator.BootAsync();
 builder.Services.AddSingleton(simulator);
 

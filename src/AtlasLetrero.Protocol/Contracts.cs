@@ -91,7 +91,7 @@ public static class BinaryFrameCodec
     }
 }
 
-public enum SceneElementKind { Pixel, Rectangle, Line, Circle, Text }
+public enum SceneElementKind { Pixel, Rectangle, Line, Circle, Text, Image }
 
 public sealed record FontDocument(string Id, int Width, int Height, int Spacing, IReadOnlyDictionary<char, ulong> Glyphs)
 {
@@ -99,9 +99,25 @@ public sealed record FontDocument(string Id, int Width, int Height, int Spacing,
     public static FontDocument FromDomain(FontProfile font) => new(font.Id, font.GlyphWidth, font.GlyphHeight, font.Spacing, font.Glyphs);
 }
 
+public sealed record ImageDocument(int Width, int Height, ColorModel ColorModel, IReadOnlyList<Pixel> Pixels)
+{
+    public FrameBuffer ToDomain()
+    {
+        if (Width <= 0 || Height <= 0 || Pixels.Count != checked(Width * Height))
+            throw new ProtocolException("Image dimensions or pixels are invalid.");
+        var frame = new FrameBuffer(Width, Height, ColorModel);
+        for (var index = 0; index < Pixels.Count; index++) frame[index % Width, index / Width] = Pixels[index];
+        return frame;
+    }
+    public static ImageDocument FromDomain(FrameBuffer image) =>
+        new(image.Width, image.Height, image.ColorModel, image.Pixels.ToArray());
+}
+
 public sealed record SceneElementDocument(SceneElementKind Kind, int X, int Y, int X2, int Y2,
     int Width, int Height, int Radius, Pixel Color, bool Fill, string? Text = null,
-    int LetterSpacing = 0, FontDocument? Font = null)
+    int LetterSpacing = 0, FontDocument? Font = null, int? OutputGlyphWidth = null,
+    int? OutputGlyphHeight = null, bool Scroll = false, long ScrollPeriodMilliseconds = 0,
+    bool TransparentOff = true, ImageDocument? Image = null)
 {
     public ISceneElement ToDomain() => Kind switch
     {
@@ -109,8 +125,11 @@ public sealed record SceneElementDocument(SceneElementKind Kind, int X, int Y, i
         SceneElementKind.Rectangle => new RectangleElement(X, Y, Width, Height, Color, Fill),
         SceneElementKind.Line => new LineElement(X, Y, X2, Y2, Color),
         SceneElementKind.Circle => new CircleElement(X, Y, Radius, Color),
-        SceneElementKind.Text when Font is not null => new TextElement(Text ?? string.Empty, X, Y, Color, Font.ToDomain(), LetterSpacing),
+        SceneElementKind.Text when Font is not null => new TextElement(Text ?? string.Empty, X, Y, Color, Font.ToDomain(), LetterSpacing,
+            OutputGlyphWidth, OutputGlyphHeight, Scroll, ScrollPeriodMilliseconds > 0 ? TimeSpan.FromMilliseconds(ScrollPeriodMilliseconds) : null),
         SceneElementKind.Text => throw new ProtocolException("Text element requires a font."),
+        SceneElementKind.Image when Image is not null => new ImageElement(X, Y, Image.ToDomain(), TransparentOff),
+        SceneElementKind.Image => throw new ProtocolException("Image element requires image data."),
         _ => throw new ProtocolException("Scene element kind is unsupported.")
     };
 
@@ -121,21 +140,31 @@ public sealed record SceneElementDocument(SceneElementKind Kind, int X, int Y, i
         LineElement value => new(SceneElementKind.Line, value.X0, value.Y0, value.X1, value.Y1, 0, 0, 0, value.Color, false),
         CircleElement value => new(SceneElementKind.Circle, value.CenterX, value.CenterY, 0, 0, 0, 0, value.Radius, value.Color, false),
         TextElement value => new(SceneElementKind.Text, value.X, value.Y, 0, 0, 0, 0, 0, value.Color, false,
-            value.Text, value.LetterSpacing, FontDocument.FromDomain(value.Font)),
+            value.Text, value.LetterSpacing, FontDocument.FromDomain(value.Font), value.OutputGlyphWidth, value.OutputGlyphHeight,
+            value.Scroll, checked((long)(value.ScrollPeriod?.TotalMilliseconds ?? 0))),
+        ImageElement value => new(SceneElementKind.Image, value.X, value.Y, 0, 0, value.Image.Width, value.Image.Height, 0,
+            Pixel.Off, false, TransparentOff: value.TransparentOff, Image: ImageDocument.FromDomain(value.Image)),
         _ => throw new ProtocolException($"Element '{element.GetType().Name}' is not supported by autonomous scene protocol V1.")
     };
 }
 
 public sealed record LayerDocument(string Name, bool Visible, IReadOnlyList<SceneElementDocument> Elements);
-public sealed record AnimationDocument(AnimationKind Kind, long DurationMilliseconds, double Speed, bool Repeat)
+public sealed record AnimationDocument(AnimationKind Kind, long DurationMilliseconds, double Speed, bool Repeat,
+    EasingKind Easing = EasingKind.Linear)
 {
-    public Animation ToDomain() => new(Kind, TimeSpan.FromMilliseconds(DurationMilliseconds), Speed, Repeat);
-    public static AnimationDocument FromDomain(Animation value) => new(value.Kind, checked((long)value.Duration.TotalMilliseconds), value.Speed, value.Repeat);
+    public Animation ToDomain() => new(Kind, TimeSpan.FromMilliseconds(DurationMilliseconds), Speed, Repeat, Easing);
+    public static AnimationDocument FromDomain(Animation value) => new(value.Kind, checked((long)value.Duration.TotalMilliseconds), value.Speed, value.Repeat, value.Easing);
+}
+public sealed record TransitionDocument(TransitionKind Kind, long DurationMilliseconds, EasingKind Easing)
+{
+    public SceneTransition ToDomain() => new(Kind, TimeSpan.FromMilliseconds(DurationMilliseconds), Easing);
+    public static TransitionDocument FromDomain(SceneTransition value) =>
+        new(value.Kind, checked((long)value.Duration.TotalMilliseconds), value.Easing);
 }
 
 public sealed record SceneDocument(int ProtocolVersion, Guid Id, string Name, int Width, int Height,
     long DurationMilliseconds, ColorModel ColorModel, IReadOnlyList<LayerDocument> Layers,
-    IReadOnlyList<AnimationDocument> Animations)
+    IReadOnlyList<AnimationDocument> Animations, TransitionDocument? Transition = null)
 {
     public Scene ToDomain()
     {
@@ -145,7 +174,7 @@ public sealed record SceneDocument(int ProtocolVersion, Guid Id, string Name, in
         {
             return new Scene(Id, Name, Width, Height, TimeSpan.FromMilliseconds(DurationMilliseconds),
                 Layers.Select(layer => new Layer(layer.Name, layer.Elements.Select(element => element.ToDomain()).ToArray(), layer.Visible)),
-                ColorModel, Animations.Select(animation => animation.ToDomain()));
+                ColorModel, Animations.Select(animation => animation.ToDomain()), Transition?.ToDomain());
         }
         catch (ProtocolException) { throw; }
         catch (Exception exception) when (exception is ArgumentException or OverflowException)
@@ -156,7 +185,8 @@ public sealed record SceneDocument(int ProtocolVersion, Guid Id, string Name, in
         scene.Height, checked((long)scene.Duration.TotalMilliseconds), scene.ColorModel,
         scene.Layers.Select(layer => new LayerDocument(layer.Name, layer.Visible,
             layer.Elements.Select(SceneElementDocument.FromDomain).ToArray())).ToArray(),
-        scene.Animations.Select(AnimationDocument.FromDomain).ToArray());
+        scene.Animations.Select(AnimationDocument.FromDomain).ToArray(),
+        scene.Transition is null ? null : TransitionDocument.FromDomain(scene.Transition));
 }
 
 public static class SceneProtocolCodec

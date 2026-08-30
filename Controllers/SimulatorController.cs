@@ -31,10 +31,25 @@ public sealed class SimulatorController(SimulatorDevice device) : ControllerBase
     [RequestSizeLimit(512 * 1024)]
     public async Task<IActionResult> Design(DesignRequest request, CancellationToken cancellationToken)
     {
-        if (request.Width != 32 || request.Height != 16 || request.Pixels.Length != request.Width * request.Height)
-            return BadRequest(new { code = "InvalidCanvas", message = "El diseño debe medir 32 × 16 píxeles." });
-        if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Length > 100 || request.DurationSeconds is < 0.1 or > 3600 || request.Speed is < 0.1 or > 10)
-            return BadRequest(new { code = "InvalidDesign", message = "Nombre o animación fuera de rango." });
+        if (request.ProtocolVersion != 1)
+            return DesignProblem("ProtocolVersionUnsupported", "La versión de protocolo no es compatible.");
+        if (request.SceneId == Guid.Empty)
+            return DesignProblem("InvalidSceneId", "La escena necesita un identificador estable.");
+
+        var capabilities = device.GetCapabilities();
+        if (request.Width != capabilities.Width || request.Height != capabilities.Height)
+            return DesignProblem("CanvasMismatch", $"El dispositivo requiere {capabilities.Width} × {capabilities.Height} píxeles.");
+        if (request.Pixels is null || request.Pixels.Length != checked(request.Width * request.Height))
+            return DesignProblem("InvalidPixels", "La cantidad de píxeles no coincide con el canvas.");
+        if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Length > 100)
+            return DesignProblem("InvalidName", "El nombre debe contener entre 1 y 100 caracteres.");
+        if (request.DurationSeconds is < 0.1 or > 3600 || !double.IsFinite(request.DurationSeconds))
+            return DesignProblem("InvalidDuration", "La duración debe estar entre 0.1 y 3600 segundos.");
+        if (request.Speed is < 0.1 or > 10 || !double.IsFinite(request.Speed))
+            return DesignProblem("InvalidSpeed", "La velocidad debe estar entre 0.1 y 10.");
+        if (!TryAnimation(request.Animation, request.DurationSeconds, request.Speed, request.Repeat, out var animations))
+            return DesignProblem("InvalidAnimation", "La animación solicitada no está soportada.");
+
         var elements = new List<ISceneElement>();
         for (var index = 0; index < request.Pixels.Length; index++)
         {
@@ -42,13 +57,36 @@ public sealed class SimulatorController(SimulatorDevice device) : ControllerBase
             elements.Add(new PixelElement(index % request.Width, index / request.Width,
                 new((byte)(color >> 16), (byte)(color >> 8), (byte)color)));
         }
-        var animations = Animation(request.Animation, request.DurationSeconds, request.Speed);
-        var scene = new Scene(Guid.NewGuid(), request.Name.Trim(), request.Width, request.Height,
+        var scene = new Scene(request.SceneId, request.Name.Trim(), request.Width, request.Height,
             TimeSpan.FromSeconds(request.DurationSeconds), [new Layer("Contenido", elements)], animations: animations);
         await device.UploadSceneAsync(SceneProtocolCodec.Encode(scene), cancellationToken);
         await device.SetBrightnessAsync(new(1, request.Brightness), cancellationToken);
         await device.PlayAsync(new(1, scene.Id), cancellationToken);
-        return Ok(new { sceneId = scene.Id, pixels = elements.Count, playing = true });
+        return Ok(new { protocolVersion = 1, sceneId = scene.Id, pixels = elements.Count, playing = true });
+    }
+
+    [HttpPost("scene")]
+    [RequestSizeLimit(SceneProtocolCodec.MaximumSceneBytes)]
+    public async Task<IActionResult> Scene(SemanticDesignRequest request, CancellationToken cancellationToken)
+    {
+        if (request.ProtocolVersion != ProtocolVersions.Current)
+            return DesignProblem("ProtocolVersionUnsupported", "La versión de protocolo no es compatible.");
+        if (request.Scene is null) return DesignProblem("MissingScene", "El documento semántico de escena es obligatorio.");
+        try
+        {
+            var scene = request.Scene.ToDomain();
+            var capabilities = device.GetCapabilities();
+            if (scene.Width != capabilities.Width || scene.Height != capabilities.Height)
+                return DesignProblem("CanvasMismatch", $"El dispositivo requiere {capabilities.Width} × {capabilities.Height} píxeles.");
+            await device.UploadSceneAsync(SceneProtocolCodec.Encode(scene), cancellationToken);
+            await device.SetBrightnessAsync(new(ProtocolVersions.Current, request.Brightness), cancellationToken);
+            await device.PlayAsync(new(ProtocolVersions.Current, scene.Id), cancellationToken);
+            return Ok(new { protocolVersion = ProtocolVersions.Current, sceneId = scene.Id, layers = scene.Layers.Count, playing = true });
+        }
+        catch (ProtocolException exception)
+        {
+            return DesignProblem("InvalidScene", exception.Message);
+        }
     }
 
     [HttpPost("play")]
@@ -63,12 +101,36 @@ public sealed class SimulatorController(SimulatorDevice device) : ControllerBase
     public async Task<IActionResult> Brightness(BrightnessRequest request, CancellationToken cancellationToken)
     { await device.SetBrightnessAsync(request, cancellationToken); return NoContent(); }
 
-    private static Animation[] Animation(string value, double duration, double speed) => value.ToLowerInvariant() switch
+    private IActionResult DesignProblem(string code, string detail) => BadRequest(new ProblemDetails
     {
-        "none" => [], "blink" => [new(AnimationKind.Blink, TimeSpan.FromSeconds(duration), speed, true)],
-        "scroll" => [new(AnimationKind.Scroll, TimeSpan.FromSeconds(duration), speed, true)],
-        "pulse" => [new(AnimationKind.Pulse, TimeSpan.FromSeconds(duration), speed, true)],
-        "wipe" => [new(AnimationKind.Wipe, TimeSpan.FromSeconds(duration), speed, true)],
-        _ => throw new ArgumentException("Animación no soportada.")
-    };
+        Status = StatusCodes.Status400BadRequest,
+        Title = code,
+        Detail = detail,
+        Type = $"https://atlasletrero.local/problems/{code.ToLowerInvariant()}"
+    });
+
+    private static bool TryAnimation(string? value, double duration, double speed, bool repeat, out Animation[] animations)
+    {
+        if (string.Equals(value, "none", StringComparison.OrdinalIgnoreCase))
+        {
+            animations = repeat ? [new(AnimationKind.Frame, TimeSpan.FromSeconds(duration), 1, true)] : [];
+            return true;
+        }
+
+        var parsed = value?.ToLowerInvariant() switch
+        {
+            "blink" => AnimationKind.Blink,
+            "fade" => AnimationKind.Fade,
+            "scroll" => AnimationKind.Scroll,
+            "slide" => AnimationKind.Slide,
+            "zoom" => AnimationKind.Zoom,
+            "pulse" => AnimationKind.Pulse,
+            "wipe" => AnimationKind.Wipe,
+            "marquee" => AnimationKind.Marquee,
+            "frame" => AnimationKind.Frame,
+            _ => (AnimationKind?)null
+        };
+        animations = parsed is null ? [] : [new(parsed.Value, TimeSpan.FromSeconds(duration), speed, repeat)];
+        return parsed is not null;
+    }
 }
