@@ -1,0 +1,32 @@
+﻿@{
+    ViewData["Title"] = "Editor";
+}
+<div class="app-shell">
+    <header class="topbar">
+        <a class="brand" href="/" aria-label="AtlasLetrero, inicio"><span class="brand-mark">A</span><span>Atlas<strong>Letrero</strong></span></a>
+        <div class="design-name"><span class="eyebrow">DISEÑO ACTUAL</span><input id="designName" value="Anuncio principal" aria-label="Nombre del diseño" /></div>
+        <div class="top-actions"><span class="device-state"><i></i> Simulador conectado</span><button class="button ghost">Guardar</button><button class="button primary" id="sendButton">Enviar al letrero</button></div>
+    </header>
+    <section class="workspace">
+        <aside class="tool-rail" aria-label="Herramientas de dibujo">
+            <span class="rail-label">HERRAMIENTAS</span>
+            <button class="tool active" data-tool="pencil"><span>✎</span>Lápiz</button><button class="tool" data-tool="eraser"><span>⌫</span>Borrar</button><button class="tool" data-tool="line"><span>╱</span>Línea</button><button class="tool" data-tool="rectangle"><span>□</span>Rectángulo</button><button class="tool" data-tool="circle"><span>○</span>Círculo</button><button class="tool" data-tool="fill"><span>◩</span>Relleno</button><button class="tool" data-tool="text"><span>T</span>Texto</button><button class="tool" data-tool="move"><span>✥</span>Mover</button><button class="tool" id="imageButton"><span>▧</span>Imagen</button><input id="imageInput" type="file" accept="image/*" hidden />
+            <div class="rail-divider"></div><button class="tool" id="undoButton"><span>↶</span>Deshacer</button><button class="tool" id="redoButton"><span>↷</span>Rehacer</button>
+        </aside>
+        <section class="stage-panel">
+            <div class="stage-toolbar"><div><span class="status-dot"></span><strong>Canvas 32 × 16</strong><span class="muted">512 píxeles · RGB</span></div><div class="zoom-controls"><button id="zoomOut">−</button><span id="zoomValue">100%</span><button id="zoomIn">+</button><button class="grid-toggle active" id="gridToggle"># Cuadrícula</button></div></div>
+            <div class="canvas-wrap"><div class="canvas-glow"><div id="pixelCanvas" class="pixel-canvas show-grid" role="application" aria-label="Canvas de píxeles LED"></div></div></div>
+            <div class="playback-bar"><button class="round-button" id="playButton">▶</button><button class="round-button" id="stopButton">■</button><span class="timecode">00:00.0</span><div class="timeline"><i></i></div><span class="timecode">00:06.0</span></div>
+        </section>
+        <aside class="properties">
+            <div class="panel-heading"><div><span class="eyebrow">PROPIEDADES</span><h2>Contenido</h2></div><span class="chip">LED</span></div>
+            <label class="field-label" for="colorPicker">Color</label><div class="color-field"><input id="colorPicker" type="color" value="#ff6b35" /><input id="colorHex" value="#FF6B35" maxlength="7" /></div>
+            <div class="swatches"><button style="--swatch:#ff6b35"></button><button style="--swatch:#ffd166"></button><button style="--swatch:#00e5a8"></button><button style="--swatch:#4cc9f0"></button><button style="--swatch:#ffffff"></button></div>
+            <label class="field-label" for="brightness">Brillo <output id="brightnessValue">72%</output></label><input class="range" id="brightness" type="range" min="1" max="100" value="72" />
+            <div class="section-divider"></div><label class="field-label" for="animation">Animación</label><select id="animation"><option value="none">Sin animación</option><option value="blink">Parpadeo</option><option value="scroll">Desplazamiento</option><option value="pulse">Pulso</option><option value="wipe">Barrido</option></select>
+            <div class="two-fields"><label>Duración<input id="duration" type="number" value="6" min="1" max="60" /><span>s</span></label><label>Velocidad<input id="speed" type="number" value="1" min="0.1" max="5" step="0.1" /><span>×</span></label></div>
+            <div class="section-divider"></div><span class="field-label">Letrero destino</span><button class="device-card"><span class="device-icon">▦</span><span><strong>Simulador 32 × 16</strong><small>WS2812B · serpentino</small></span><i>✓</i></button>
+            <div class="power-note"><span>ϟ</span><div><strong>Consumo estimado</strong><small id="powerEstimate">2.8 A de 10 A disponibles</small></div></div>
+        </aside>
+    </section><div id="toast" class="toast-message" role="status" aria-live="polite"></div>
+</div>

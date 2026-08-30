@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="MySqlConnector" Version="2.4.0" />
+    <ProjectReference Include="..\AtlasLetrero.Application\AtlasLetrero.Application.csproj" />
+    <ProjectReference Include="..\AtlasLetrero.Protocol\AtlasLetrero.Protocol.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="src\AtlasLetrero.Domain\AtlasLetrero.Domain.csproj" />
+    <ProjectReference Include="src\AtlasLetrero.Protocol\AtlasLetrero.Protocol.csproj" />
+    <ProjectReference Include="src\AtlasLetrero.Application\AtlasLetrero.Application.csproj" />
+    <ProjectReference Include="simulator\AtlasLetrero.Simulator\AtlasLetrero.Simulator.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="src\**\*.cs;tests\**\*.cs;simulator\**\*.cs;firmware\**\*.cs" />
+    <Content Remove="src\**;tests\**;simulator\**;firmware\**" />
+    <EmbeddedResource Remove="src\**;tests\**;simulator\**;firmware\**" />
+    <None Remove="src\**;tests\**;simulator\**;firmware\**" />
+  </ItemGroup>
+
+</Project>

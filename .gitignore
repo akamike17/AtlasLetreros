@@ -1,0 +1,10 @@
+bin/
+obj/
+.vs/
+*.user
+appsettings.Local.json
+.env
+secrets.json
+.runtime/
+firmware/**/build*/
+firmware/**/wokwi.vcd
