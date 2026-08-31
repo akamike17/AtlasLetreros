@@ -60,6 +60,17 @@ public sealed class ProductModelTests
         Assert.Equal(new Pixel(255, 0, 0), frame[2, 2]);
     }
 
+    [Theory]
+    [InlineData(0, 32)]
+    [InlineData(5, -18)]
+    [InlineData(9.999, -67)]
+    [InlineData(10, 32)]
+    public void MarqueeUsesGoldenHorizontalOrigin(double seconds, int expectedX)
+    {
+        Assert.Equal(expectedX, TextElement.MarqueeOrigin(
+            32, 68, TimeSpan.FromSeconds(seconds), TimeSpan.FromSeconds(10)));
+    }
+
     [Fact]
     public void CertificationCannotClaimUntestedHardware()
     {

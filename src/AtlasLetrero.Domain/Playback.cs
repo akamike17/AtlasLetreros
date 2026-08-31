@@ -72,29 +72,52 @@ public sealed record Schedule
 
 public sealed record FontProfile
 {
-    public FontProfile(string id, int glyphWidth, int glyphHeight, int spacing, IReadOnlyDictionary<char, ulong> glyphs)
+    public FontProfile(string id, int glyphWidth, int glyphHeight, int spacing, IReadOnlyDictionary<char, ushort[]> rows)
     {
         if (string.IsNullOrWhiteSpace(id)) throw new ArgumentException("Font id is required.", nameof(id));
-        if (glyphWidth <= 0 || glyphHeight <= 0 || glyphWidth * glyphHeight > 64) throw new ArgumentOutOfRangeException(nameof(glyphWidth));
+        if (glyphWidth <= 0 || glyphWidth > 16) throw new ArgumentOutOfRangeException(nameof(glyphWidth));
+        if (glyphHeight <= 0) throw new ArgumentOutOfRangeException(nameof(glyphHeight));
         if (spacing < 0) throw new ArgumentOutOfRangeException(nameof(spacing));
-        if (glyphs is not { Count: > 0 }) throw new ArgumentException("At least one glyph is required.", nameof(glyphs));
-        Id = id.Trim(); GlyphWidth = glyphWidth; GlyphHeight = glyphHeight; Spacing = spacing; Glyphs = glyphs;
+        if (rows is not { Count: > 0 }) throw new ArgumentException("At least one glyph is required.", nameof(rows));
+        var allowedBits = glyphWidth == 16 ? ushort.MaxValue : (ushort)((1u << glyphWidth) - 1);
+        foreach (var glyph in rows.Values)
+        {
+            if (glyph is null || glyph.Length != glyphHeight)
+                throw new ArgumentException("Each glyph must contain exactly glyphHeight rows.", nameof(rows));
+            if (glyph.Any(row => (row & ~allowedBits) != 0))
+                throw new ArgumentException("A glyph row uses bits outside glyphWidth.", nameof(rows));
+        }
+        Id = id.Trim(); GlyphWidth = glyphWidth; GlyphHeight = glyphHeight; Spacing = spacing; Rows = rows;
     }
+
+    public FontProfile(string id, int glyphWidth, int glyphHeight, int spacing, IReadOnlyDictionary<char, ulong> glyphs)
+        : this(id, glyphWidth, glyphHeight, spacing, FromLegacy(glyphWidth, glyphHeight, glyphs)) { }
     public string Id { get; }
     public int GlyphWidth { get; }
     public int GlyphHeight { get; }
     public int Spacing { get; }
-    public IReadOnlyDictionary<char, ulong> Glyphs { get; }
+    public IReadOnlyDictionary<char, ushort[]> Rows { get; }
     public bool IsPixelSet(char character, int x, int y)
     {
         if ((uint)x >= GlyphWidth || (uint)y >= GlyphHeight) return false;
-        if (!Glyphs.TryGetValue(character, out var bits) && !Glyphs.TryGetValue('?', out bits)) return false;
-        return (bits & (1UL << (y * GlyphWidth + x))) != 0;
+        if (!Rows.TryGetValue(character, out var rows) && !Rows.TryGetValue('?', out rows)) return false;
+        return (rows[y] & (1 << x)) != 0;
+    }
+
+    private static IReadOnlyDictionary<char, ushort[]> FromLegacy(
+        int width, int height, IReadOnlyDictionary<char, ulong> glyphs)
+    {
+        ArgumentNullException.ThrowIfNull(glyphs);
+        if (width <= 0 || width > 16 || height <= 0 || (long)width * height > 64)
+            throw new ArgumentOutOfRangeException(nameof(width), "Legacy glyphs cannot exceed 64 bits.");
+        return glyphs.ToDictionary(pair => pair.Key, pair => Enumerable.Range(0, height)
+            .Select(y => (ushort)((pair.Value >> (y * width)) & ((1UL << width) - 1))).ToArray());
     }
 }
 
 public sealed record TextElement(string Text, int X, int Y, Pixel Color, FontProfile Font, int LetterSpacing = 0,
-    int? OutputGlyphWidth = null, int? OutputGlyphHeight = null, bool Scroll = false, TimeSpan? ScrollPeriod = null) : ISceneElement
+    int? OutputGlyphWidth = null, int? OutputGlyphHeight = null, bool Scroll = false, TimeSpan? ScrollPeriod = null,
+    int LineSpacing = 1) : ISceneElement
 {
     public void Render(FrameBuffer target, TimeSpan position)
     {
@@ -105,17 +128,34 @@ public sealed record TextElement(string Text, int X, int Y, Pixel Color, FontPro
         if (Scroll)
         {
             var period = ScrollPeriod.GetValueOrDefault(TimeSpan.FromSeconds(1));
-            var contentWidth = Text.Length * (width + Font.Spacing + LetterSpacing);
-            var distance = Math.Max(1, contentWidth + target.Width);
-            origin -= (int)Math.Floor(position.TotalMilliseconds % period.TotalMilliseconds / period.TotalMilliseconds * distance);
+            var advance = width + Font.Spacing + LetterSpacing;
+            var contentWidth = Text.Replace("\r", "").Split('\n')
+                .Max(line => Math.Max(0, line.Length * advance - Font.Spacing - LetterSpacing));
+            origin = MarqueeOrigin(target.Width, contentWidth, position, period);
         }
-        var cursor = origin;
-        foreach (var character in Text)
+        var lines = Text.Replace("\r", "").Split('\n');
+        for (var lineIndex = 0; lineIndex < lines.Length; lineIndex++)
         {
-            for (var y = 0; y < height; y++) for (var x = 0; x < width; x++)
-                if (Font.IsPixelSet(character, x * Font.GlyphWidth / width, y * Font.GlyphHeight / height))
-                    target.TrySetPixel(cursor + x, Y + y, Color);
-            cursor += width + Font.Spacing + LetterSpacing;
+            var cursor = origin;
+            foreach (var character in lines[lineIndex])
+            {
+                for (var y = 0; y < height; y++) for (var x = 0; x < width; x++)
+                    if (Font.IsPixelSet(character, x * Font.GlyphWidth / width, y * Font.GlyphHeight / height))
+                        target.TrySetPixel(cursor + x, Y + lineIndex * (height + Math.Max(0, LineSpacing)) + y, Color);
+                cursor += width + Font.Spacing + LetterSpacing;
+            }
         }
+    }
+
+    public static int MarqueeOrigin(int canvasWidth, int contentWidth, TimeSpan position, TimeSpan period)
+    {
+        if (canvasWidth <= 0) throw new ArgumentOutOfRangeException(nameof(canvasWidth));
+        if (contentWidth < 0) throw new ArgumentOutOfRangeException(nameof(contentWidth));
+        if (period <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(period));
+        var elapsed = position.TotalMilliseconds % period.TotalMilliseconds;
+        if (elapsed < 0) elapsed += period.TotalMilliseconds;
+        var progress = elapsed / period.TotalMilliseconds;
+        var distance = canvasWidth + contentWidth;
+        return canvasWidth - (int)Math.Floor(progress * distance);
     }
 }

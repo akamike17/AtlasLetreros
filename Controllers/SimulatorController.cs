@@ -19,12 +19,28 @@ public sealed class SimulatorController(SimulatorDevice device) : ControllerBase
     [HttpGet("snapshot")]
     public VirtualDisplaySnapshot Snapshot() => device.Snapshot;
 
+    [HttpGet("output")]
+    public object Output()
+    {
+        var capabilities = device.GetCapabilities();
+        return new
+        {
+            protocolVersion = ProtocolVersions.Current,
+            device = capabilities,
+            runtime = device.Status,
+            snapshot = device.Snapshot,
+            targetFramesPerSecond = Math.Min(30, device.Driver.Capabilities.MaxFramesPerSecond),
+            updatedAtUtc = DateTimeOffset.UtcNow
+        };
+    }
+
     [HttpPost("frame")]
     [RequestSizeLimit(2 * 1024 * 1024)]
     public async Task<IActionResult> Frame(CancellationToken cancellationToken)
     {
         using var buffer = new MemoryStream(); await Request.Body.CopyToAsync(buffer, cancellationToken);
-        await device.ReceiveFrameAsync(buffer.ToArray(), cancellationToken); return NoContent();
+        return await ExecuteProtocolActionAsync(
+            () => device.ReceiveFrameAsync(buffer.ToArray(), cancellationToken));
     }
 
     [HttpPost("design")]
@@ -90,20 +106,51 @@ public sealed class SimulatorController(SimulatorDevice device) : ControllerBase
     }
 
     [HttpPost("play")]
-    public async Task<IActionResult> Play(PlayRequest request, CancellationToken cancellationToken)
-    { await device.PlayAsync(request, cancellationToken); return NoContent(); }
+    public Task<IActionResult> Play(PlayRequest request, CancellationToken cancellationToken) =>
+        ExecuteProtocolActionAsync(() => device.PlayAsync(request, cancellationToken), catchArgumentException: true);
 
     [HttpPost("stop")]
-    public async Task<IActionResult> Stop(StopRequest request, CancellationToken cancellationToken)
-    { await device.StopAsync(request, cancellationToken); return NoContent(); }
+    public Task<IActionResult> Stop(StopRequest request, CancellationToken cancellationToken) =>
+        ExecuteProtocolActionAsync(() => device.StopAsync(request, cancellationToken));
 
     [HttpPost("brightness")]
-    public async Task<IActionResult> Brightness(BrightnessRequest request, CancellationToken cancellationToken)
-    { await device.SetBrightnessAsync(request, cancellationToken); return NoContent(); }
+    public Task<IActionResult> Brightness(BrightnessRequest request, CancellationToken cancellationToken) =>
+        ExecuteProtocolActionAsync(() => device.SetBrightnessAsync(request, cancellationToken));
+
+    private async Task<IActionResult> ExecuteProtocolActionAsync(
+        Func<ValueTask> action,
+        bool catchArgumentException = false)
+    {
+        try
+        {
+            await action();
+            return NoContent();
+        }
+        catch (ProtocolException exception)
+        {
+            return ClientProblem(StatusCodes.Status400BadRequest, "InvalidProtocol", exception.Message);
+        }
+        catch (ArgumentException exception) when (catchArgumentException)
+        {
+            return ClientProblem(StatusCodes.Status400BadRequest, "InvalidArgument", exception.Message);
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return ClientProblem(StatusCodes.Status404NotFound, "SceneNotFound", exception.Message);
+        }
+    }
 
     private IActionResult DesignProblem(string code, string detail) => BadRequest(new ProblemDetails
     {
         Status = StatusCodes.Status400BadRequest,
+        Title = code,
+        Detail = detail,
+        Type = $"https://atlasletrero.local/problems/{code.ToLowerInvariant()}"
+    });
+
+    private ObjectResult ClientProblem(int status, string code, string detail) => StatusCode(status, new ProblemDetails
+    {
+        Status = status,
         Title = code,
         Detail = detail,
         Type = $"https://atlasletrero.local/problems/{code.ToLowerInvariant()}"

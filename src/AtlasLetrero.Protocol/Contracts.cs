@@ -93,10 +93,18 @@ public static class BinaryFrameCodec
 
 public enum SceneElementKind { Pixel, Rectangle, Line, Circle, Text, Image }
 
-public sealed record FontDocument(string Id, int Width, int Height, int Spacing, IReadOnlyDictionary<char, ulong> Glyphs)
+public sealed record FontDocument(string Id, int Width, int Height, int Spacing,
+    IReadOnlyDictionary<char, ushort[]>? Rows = null,
+    IReadOnlyDictionary<char, ulong>? Glyphs = null)
 {
-    public FontProfile ToDomain() => new(Id, Width, Height, Spacing, Glyphs);
-    public static FontDocument FromDomain(FontProfile font) => new(font.Id, font.GlyphWidth, font.GlyphHeight, font.Spacing, font.Glyphs);
+    public FontProfile ToDomain()
+    {
+        if (Rows is { Count: > 0 }) return new(Id, Width, Height, Spacing, Rows);
+        if (Glyphs is { Count: > 0 }) return new(Id, Width, Height, Spacing, Glyphs);
+        throw new ProtocolException("Font rows are required.");
+    }
+    public static FontDocument FromDomain(FontProfile font) =>
+        new(font.Id, font.GlyphWidth, font.GlyphHeight, font.Spacing, Rows: font.Rows);
 }
 
 public sealed record ImageDocument(int Width, int Height, ColorModel ColorModel, IReadOnlyList<Pixel> Pixels)
@@ -117,7 +125,7 @@ public sealed record SceneElementDocument(SceneElementKind Kind, int X, int Y, i
     int Width, int Height, int Radius, Pixel Color, bool Fill, string? Text = null,
     int LetterSpacing = 0, FontDocument? Font = null, int? OutputGlyphWidth = null,
     int? OutputGlyphHeight = null, bool Scroll = false, long ScrollPeriodMilliseconds = 0,
-    bool TransparentOff = true, ImageDocument? Image = null)
+    bool TransparentOff = true, ImageDocument? Image = null, int LineSpacing = 1)
 {
     public ISceneElement ToDomain() => Kind switch
     {
@@ -126,7 +134,8 @@ public sealed record SceneElementDocument(SceneElementKind Kind, int X, int Y, i
         SceneElementKind.Line => new LineElement(X, Y, X2, Y2, Color),
         SceneElementKind.Circle => new CircleElement(X, Y, Radius, Color),
         SceneElementKind.Text when Font is not null => new TextElement(Text ?? string.Empty, X, Y, Color, Font.ToDomain(), LetterSpacing,
-            OutputGlyphWidth, OutputGlyphHeight, Scroll, ScrollPeriodMilliseconds > 0 ? TimeSpan.FromMilliseconds(ScrollPeriodMilliseconds) : null),
+            OutputGlyphWidth, OutputGlyphHeight, Scroll, ScrollPeriodMilliseconds > 0 ? TimeSpan.FromMilliseconds(ScrollPeriodMilliseconds) : null,
+            LineSpacing),
         SceneElementKind.Text => throw new ProtocolException("Text element requires a font."),
         SceneElementKind.Image when Image is not null => new ImageElement(X, Y, Image.ToDomain(), TransparentOff),
         SceneElementKind.Image => throw new ProtocolException("Image element requires image data."),
@@ -141,7 +150,7 @@ public sealed record SceneElementDocument(SceneElementKind Kind, int X, int Y, i
         CircleElement value => new(SceneElementKind.Circle, value.CenterX, value.CenterY, 0, 0, 0, 0, value.Radius, value.Color, false),
         TextElement value => new(SceneElementKind.Text, value.X, value.Y, 0, 0, 0, 0, 0, value.Color, false,
             value.Text, value.LetterSpacing, FontDocument.FromDomain(value.Font), value.OutputGlyphWidth, value.OutputGlyphHeight,
-            value.Scroll, checked((long)(value.ScrollPeriod?.TotalMilliseconds ?? 0))),
+            value.Scroll, checked((long)(value.ScrollPeriod?.TotalMilliseconds ?? 0)), LineSpacing: value.LineSpacing),
         ImageElement value => new(SceneElementKind.Image, value.X, value.Y, 0, 0, value.Image.Width, value.Image.Height, 0,
             Pixel.Off, false, TransparentOff: value.TransparentOff, Image: ImageDocument.FromDomain(value.Image)),
         _ => throw new ProtocolException($"Element '{element.GetType().Name}' is not supported by autonomous scene protocol V1.")

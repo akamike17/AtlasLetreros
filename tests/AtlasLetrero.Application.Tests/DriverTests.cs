@@ -64,6 +64,27 @@ public sealed class DriverTests
         await Assert.ThrowsAsync<InvalidOperationException>(async () => await runtime.BootAsync(new("test", topology)));
     }
 
+    [Fact]
+    public async Task BrightnessChangePreservesRuntimePositionAndCurrentFrame()
+    {
+        var driver = new VirtualDisplayDriver();
+        var store = new MemorySceneStore();
+        var runtime = new ControllerRuntime(driver, store);
+        var topology = new MatrixTopology(2, 1, [new(0, 0, 2, 1)]);
+        var scene = new Scene(Guid.NewGuid(), "Brightness", 2, 1, TimeSpan.FromSeconds(2),
+            [new("content", [new PixelElement(1, 0, new Pixel(200, 100, 50))])]);
+        await runtime.BootAsync(new("test", topology));
+        await runtime.UploadAsync(scene);
+        await runtime.PlayAsync(scene.Id);
+        await runtime.RenderAsync(TimeSpan.FromSeconds(.75));
+
+        await runtime.SetBrightnessAsync(128);
+
+        Assert.Equal(.75, runtime.Status.PositionSeconds, 3);
+        Assert.Equal(Pixel.Off, driver.LastFrame![0, 0]);
+        Assert.Equal(new Pixel(100, 50, 25), driver.LastFrame.GetOutputPixel(1, 0));
+    }
+
     private sealed class LimitedDriver(int maxPixels = 10) : IDisplayDriver
     {
         public bool Initialized { get; private set; }

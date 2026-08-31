@@ -33,6 +33,7 @@ public sealed class ProtocolTests
         var decoded = SceneProtocolCodec.Decode(SceneProtocolCodec.Encode(source));
         var text = Assert.IsType<TextElement>(decoded.Layers[0].Elements[0]);
         Assert.Equal((6, 7, true), (text.OutputGlyphWidth, text.OutputGlyphHeight, text.Scroll));
+        Assert.Equal(TimeSpan.FromSeconds(3), text.ScrollPeriod);
         Assert.Equal(source.Transition, decoded.Transition);
         Assert.Equal(EasingKind.EaseInOut, decoded.Animations[0].Easing);
     }
@@ -90,5 +91,49 @@ public sealed class ProtocolTests
         var brightness = ProtocolJson.Deserialize<BrightnessRequest>(ProtocolJson.Serialize(new BrightnessRequest(1, 127)));
         Assert.Equal(sceneId, play.SceneId);
         Assert.Equal(127, brightness.Brightness);
+    }
+
+    [Fact]
+    public void TenByFourteenFontRowsRoundTripAndRenderPixelsAfterLegacyBitLimit()
+    {
+        var rows = Enumerable.Repeat((ushort)0, 14).ToArray();
+        rows[13] = 1 << 9;
+        var font = new FontProfile("10x14", 10, 14, 0,
+            new Dictionary<char, ushort[]> { ['A'] = rows, ['?'] = new ushort[14] });
+        var scene = new Scene(Guid.NewGuid(), "Rows", 10, 14, TimeSpan.FromSeconds(1),
+            [new("text", [new TextElement("A", 0, 0, new Pixel(255, 255, 255), font)])]);
+
+        var decoded = SceneProtocolCodec.Decode(SceneProtocolCodec.Encode(scene));
+        var rendered = SceneEngine.Render(decoded, TimeSpan.Zero);
+
+        Assert.Equal(new Pixel(255, 255, 255), rendered[9, 13]);
+        var text = Assert.IsType<TextElement>(decoded.Layers[0].Elements[0]);
+        Assert.Equal((10, 14), (text.Font.GlyphWidth, text.Font.GlyphHeight));
+    }
+
+    [Fact]
+    public void LegacyGlyphFieldRemainsReadable()
+    {
+        var legacy = new FontDocument("3x5", 3, 5, 0, Glyphs:
+            new Dictionary<char, ulong> { ['A'] = 1UL << 14, ['?'] = 0 });
+
+        Assert.True(legacy.ToDomain().IsPixelSet('A', 2, 4));
+    }
+
+    [Fact]
+    public void MultilineTextPreservesConfiguredLineSpacing()
+    {
+        var font = new FontProfile("1x1", 1, 1, 0,
+            new Dictionary<char, ushort[]> { ['A'] = [1], ['?'] = [0] });
+        var source = new Scene(Guid.NewGuid(), "Multiline", 1, 5, TimeSpan.FromSeconds(1),
+            [new("text", [new TextElement("A\nA", 0, 0, new Pixel(255, 255, 255), font, LineSpacing: 3)])]);
+
+        var decoded = SceneProtocolCodec.Decode(SceneProtocolCodec.Encode(source));
+        var text = Assert.IsType<TextElement>(decoded.Layers[0].Elements[0]);
+        var rendered = SceneEngine.Render(decoded, TimeSpan.Zero);
+
+        Assert.Equal(3, text.LineSpacing);
+        Assert.Equal(new Pixel(255, 255, 255), rendered[0, 0]);
+        Assert.Equal(new Pixel(255, 255, 255), rendered[0, 4]);
     }
 }

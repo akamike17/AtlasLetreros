@@ -113,6 +113,29 @@ public sealed class SimulatorTests
         await device.StopAsync(new(1));
     }
 
+    [Fact]
+    public async Task OutputPositionAdvancesAndMarqueeSnapshotsChangeUntilStop()
+    {
+        var device = Device(); await device.BootAsync();
+        var font = new FontProfile("1x1", 1, 1, 0,
+            new Dictionary<char, ushort[]> { ['A'] = [1], ['?'] = [0] });
+        var scene = new Scene(Guid.NewGuid(), "Marquee", 4, 2, TimeSpan.FromSeconds(1),
+            [new("text", [new TextElement("A", 0, 0, new Pixel(255, 0, 0), font,
+                Scroll: true, ScrollPeriod: TimeSpan.FromSeconds(1))])],
+            animations: [new(AnimationKind.Frame, TimeSpan.FromSeconds(1), repeat: true)]);
+        await device.UploadSceneAsync(SceneProtocolCodec.Encode(scene));
+        await device.PlayAsync(new(1, scene.Id));
+        var first = device.Snapshot.PhysicalChannels.ToArray();
+
+        await Task.Delay(300);
+
+        Assert.True(device.Status.PositionSeconds > 0);
+        Assert.NotEqual(first, device.Snapshot.PhysicalChannels);
+        await device.StopAsync(new(1));
+        Assert.Equal(0, device.Status.PositionSeconds);
+        Assert.All(device.Snapshot.Pixels, pixel => Assert.False(pixel.IsOn));
+    }
+
     private static SimulatorDevice Device()
     {
         var topology = new MatrixTopology(4, 2,

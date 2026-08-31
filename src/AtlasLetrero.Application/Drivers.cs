@@ -116,7 +116,7 @@ public sealed class ControllerRuntime
     {
         _brightness = brightness;
         await _driver.SetBrightnessAsync(brightness, cancellationToken);
-        if (_playing) await RenderAsync(TimeSpan.Zero, cancellationToken);
+        if (_playing) await RenderAsync(_position, cancellationToken);
     }
 
     public async ValueTask RenderAsync(TimeSpan position, CancellationToken cancellationToken = default)
