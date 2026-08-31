@@ -8,6 +8,7 @@ secrets.json
 .runtime/
 node_modules/
 test-results/
+debug.log
 .browser-run.out
 .browser-run.err
 firmware/**/build*/
