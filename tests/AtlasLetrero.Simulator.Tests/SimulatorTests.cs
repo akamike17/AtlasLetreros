@@ -185,7 +185,29 @@ public sealed class SimulatorTests
 
         Assert.False(device.Status.IsPlaying);
         Assert.Null(device.Status.ActiveSceneId);
+        Assert.Contains("Render failed", device.Status.LastError);
         Assert.All(device.Snapshot.Pixels, pixel => Assert.False(pixel.IsOn));
+    }
+
+    [Fact]
+    public async Task StatusAndSnapshotRemainSafeDuringConcurrentRestart()
+    {
+        var device = Device();
+        await device.BootAsync();
+        var reads = Task.Run(() =>
+        {
+            for (var index = 0; index < 2_000; index++)
+            {
+                Assert.NotNull(device.Status);
+                Assert.Equal((4, 2), (device.Snapshot.Width, device.Snapshot.Height));
+            }
+        });
+        var restarts = Task.Run(async () =>
+        {
+            for (var index = 0; index < 50; index++) await device.RestartAsync();
+        });
+
+        await Task.WhenAll(reads, restarts);
     }
 
     private static SimulatorDevice Device(ISceneStore? store = null)

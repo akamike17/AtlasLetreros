@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using AtlasLetrero.Application;
 using AtlasLetrero.Domain;
 using AtlasLetrero.Protocol;
@@ -8,6 +9,8 @@ public sealed class SimulatorDevice
 {
     private readonly ISceneStore _store;
     private ControllerRuntime _runtime;
+    private VirtualDisplayDriver _driver;
+    private string? _playbackError;
     private CancellationTokenSource? _playbackCancellation;
     private Task? _playbackTask;
     private readonly SemaphoreSlim _operationGate = new(1, 1);
@@ -16,14 +19,14 @@ public sealed class SimulatorDevice
     {
         Configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _store = store ?? new MemorySceneStore();
-        Driver = new VirtualDisplayDriver();
-        _runtime = new(Driver, _store);
+        _driver = new VirtualDisplayDriver();
+        _runtime = new(_driver, _store);
     }
 
     public DeviceConfiguration Configuration { get; }
-    public VirtualDisplayDriver Driver { get; private set; }
-    public RuntimeStatus Status => _runtime.Status;
-    public VirtualDisplaySnapshot Snapshot => Driver.CreateSnapshot();
+    public VirtualDisplayDriver Driver => Volatile.Read(ref _driver);
+    public RuntimeStatus Status => Volatile.Read(ref _runtime).Status with { LastError = Volatile.Read(ref _playbackError) };
+    public VirtualDisplaySnapshot Snapshot => Volatile.Read(ref _driver).CreateSnapshot();
 
     public async ValueTask BootAsync(CancellationToken cancellationToken = default)
     {
@@ -95,7 +98,7 @@ public sealed class SimulatorDevice
         var frame = BinaryFrameCodec.Decode(payload.Span, Configuration.Topology.Width * Configuration.Topology.Height);
         ValidateDimensions(frame.Width, frame.Height, frame.ColorModel);
         await _operationGate.WaitAsync(cancellationToken);
-        try { await Driver.RenderAsync(frame, cancellationToken); }
+        try { await _driver.RenderAsync(frame, cancellationToken); }
         finally { _operationGate.Release(); }
     }
 
@@ -105,16 +108,19 @@ public sealed class SimulatorDevice
         try
         {
             await StopPlaybackLoopAsync();
-            Driver = new VirtualDisplayDriver();
-            _runtime = new(Driver, _store);
-            await _runtime.BootAsync(Configuration, cancellationToken);
-            if (_runtime.Status.IsPlaying) StartPlaybackLoop();
+            var driver = new VirtualDisplayDriver();
+            var runtime = new ControllerRuntime(driver, _store);
+            await runtime.BootAsync(Configuration, cancellationToken);
+            Volatile.Write(ref _driver, driver);
+            Volatile.Write(ref _runtime, runtime);
+            if (runtime.Status.IsPlaying) StartPlaybackLoop();
         }
         finally { _operationGate.Release(); }
     }
 
     private void StartPlaybackLoop()
     {
+        Volatile.Write(ref _playbackError, null);
         _playbackCancellation = new();
         var token = _playbackCancellation.Token;
         _playbackTask = Task.Run(async () =>
@@ -135,10 +141,12 @@ public sealed class SimulatorDevice
                 }
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested) { }
-            catch
+            catch (Exception exception)
             {
+                Volatile.Write(ref _playbackError, exception.Message);
+                Trace.TraceError("Simulator playback failed: {0}", exception);
                 try { await _runtime.StopAsync(CancellationToken.None); }
-                catch { }
+                catch (Exception stopException) { Trace.TraceError("Simulator playback recovery failed: {0}", stopException); }
             }
         }, token);
     }

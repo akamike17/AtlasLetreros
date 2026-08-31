@@ -5,6 +5,7 @@ namespace AtlasLetrero.Simulator;
 
 public sealed class VirtualDisplayDriver : IDisplayDriver
 {
+    private readonly object _gate = new();
     private DeviceConfiguration? _configuration;
     public string Id => "simulator.virtual";
     public DriverCapabilities Capabilities { get; } = new("virtual", [ColorModel.Rgb, ColorModel.Rgbw], 1_048_576, 64);
@@ -15,56 +16,71 @@ public sealed class VirtualDisplayDriver : IDisplayDriver
     public event Action<VirtualDisplaySnapshot>? FrameRendered;
 
     public ValueTask InitializeAsync(DeviceConfiguration configuration, CancellationToken cancellationToken = default)
-    { _configuration = configuration; Brightness = configuration.Brightness; return ValueTask.CompletedTask; }
+    { lock (_gate) { _configuration = configuration; Brightness = configuration.Brightness; } return ValueTask.CompletedTask; }
     public ValueTask SetBrightnessAsync(byte brightness, CancellationToken cancellationToken = default)
     {
-        Brightness = brightness;
-        if (LastFrame is not null && _configuration is not null)
+        lock (_gate)
         {
-            LastFrame.SetBrightness(brightness);
-            LastPhysicalFrame = new MatrixMapper(_configuration.Topology).Encode(LastFrame);
-            FrameRendered?.Invoke(CreateSnapshot());
+            Brightness = brightness;
+            if (LastFrame is not null && _configuration is not null)
+            {
+                LastFrame.SetBrightness(brightness);
+                LastPhysicalFrame = new MatrixMapper(_configuration.Topology).Encode(LastFrame);
+                FrameRendered?.Invoke(CreateSnapshot());
+            }
         }
         return ValueTask.CompletedTask;
     }
     public ValueTask RenderAsync(FrameBuffer frame, CancellationToken cancellationToken = default)
     {
-        var config = _configuration ?? throw new InvalidOperationException("Driver is not initialized.");
-        LastFrame = frame.Clone();
-        LastPhysicalFrame = new MatrixMapper(config.Topology).Encode(frame);
-        RenderedFrameCount++;
-        FrameRendered?.Invoke(CreateSnapshot());
+        lock (_gate)
+        {
+            var config = _configuration ?? throw new InvalidOperationException("Driver is not initialized.");
+            LastFrame = frame.Clone();
+            LastPhysicalFrame = new MatrixMapper(config.Topology).Encode(frame);
+            RenderedFrameCount++;
+            FrameRendered?.Invoke(CreateSnapshot());
+        }
         return ValueTask.CompletedTask;
     }
     public ValueTask ClearAsync(CancellationToken cancellationToken = default)
     {
-        if (_configuration is { } config) LastFrame = new(config.Topology.Width, config.Topology.Height);
-        LastPhysicalFrame = LastFrame is null || _configuration is null ? null : new MatrixMapper(_configuration.Topology).Encode(LastFrame);
-        if (LastFrame is not null) FrameRendered?.Invoke(CreateSnapshot());
+        lock (_gate)
+        {
+            if (_configuration is { } config) LastFrame = new(config.Topology.Width, config.Topology.Height);
+            LastPhysicalFrame = LastFrame is null || _configuration is null ? null : new MatrixMapper(_configuration.Topology).Encode(LastFrame);
+            if (LastFrame is not null) FrameRendered?.Invoke(CreateSnapshot());
+        }
         return ValueTask.CompletedTask;
     }
     public ValueTask TestAsync(CancellationToken cancellationToken = default)
     {
-        var config = _configuration ?? throw new InvalidOperationException("Driver is not initialized.");
-        var frame = new FrameBuffer(config.Topology.Width, config.Topology.Height);
-        frame[0, 0] = new(255, 0, 0);
-        return RenderAsync(frame, cancellationToken);
+        lock (_gate)
+        {
+            var config = _configuration ?? throw new InvalidOperationException("Driver is not initialized.");
+            var frame = new FrameBuffer(config.Topology.Width, config.Topology.Height);
+            frame[0, 0] = new(255, 0, 0);
+            return RenderAsync(frame, cancellationToken);
+        }
     }
 
     public VirtualDisplaySnapshot CreateSnapshot()
     {
-        var configuration = _configuration ?? throw new InvalidOperationException("Driver is not initialized.");
-        var frame = LastFrame ?? new FrameBuffer(configuration.Topology.Width, configuration.Topology.Height);
-        var mapper = new MatrixMapper(configuration.Topology);
-        var pixels = new VirtualPixel[frame.Width * frame.Height];
-        for (var y = 0; y < frame.Height; y++) for (var x = 0; x < frame.Width; x++)
+        lock (_gate)
         {
-            var address = mapper.Map(x, y);
-            pixels[y * frame.Width + x] = new(x, y, frame.GetOutputPixel(x, y), address.TileIndex,
-                address.PhysicalIndex, address.AbsoluteIndex);
+            var configuration = _configuration ?? throw new InvalidOperationException("Driver is not initialized.");
+            var frame = LastFrame ?? new FrameBuffer(configuration.Topology.Width, configuration.Topology.Height);
+            var mapper = new MatrixMapper(configuration.Topology);
+            var pixels = new VirtualPixel[frame.Width * frame.Height];
+            for (var y = 0; y < frame.Height; y++) for (var x = 0; x < frame.Width; x++)
+            {
+                var address = mapper.Map(x, y);
+                pixels[y * frame.Width + x] = new(x, y, frame.GetOutputPixel(x, y), address.TileIndex,
+                    address.PhysicalIndex, address.AbsoluteIndex);
+            }
+            return new(frame.Width, frame.Height, frame.ColorModel, frame.Brightness, pixels,
+                LastPhysicalFrame?.ToArray() ?? mapper.Encode(frame), configuration.Topology.Tiles.ToArray(), RenderedFrameCount);
         }
-        return new(frame.Width, frame.Height, frame.ColorModel, frame.Brightness, pixels,
-            LastPhysicalFrame?.ToArray() ?? mapper.Encode(frame), configuration.Topology.Tiles.ToArray(), RenderedFrameCount);
     }
 }
 

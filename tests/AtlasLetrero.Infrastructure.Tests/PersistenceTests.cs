@@ -106,6 +106,19 @@ public sealed class PersistenceTests : IDisposable
     }
 
     [Fact]
+    public async Task MissingFileReturnsNullButOtherIoFailuresRemainVisible()
+    {
+        var scene = Scene();
+        var store = new AtomicFileSceneStore(_root);
+        Assert.Null(await store.LoadAsync(scene.Id));
+
+        await store.SaveAsync(scene);
+        var path = Directory.GetFiles(_root, "scene-*.json").Single();
+        await using var locked = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        await Assert.ThrowsAsync<IOException>(async () => await store.LoadAsync(scene.Id));
+    }
+
+    [Fact]
     public async Task MissingStateAndSceneReturnNull()
     {
         var store = new AtomicFileSceneStore(_root);
