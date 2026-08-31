@@ -144,6 +144,8 @@ public sealed class SimulatorTests
             [new("content", [new PixelElement(0, 0, new(255, 0, 0))])],
             animations: [new(AnimationKind.Frame, TimeSpan.FromSeconds(2), repeat: true)]);
         await device.UploadSceneAsync(SceneProtocolCodec.Encode(scene));
+        var scenePayload = SceneProtocolCodec.Encode(scene);
+        var framePayload = BinaryFrameCodec.Encode(new FrameBuffer(4, 2));
 
         for (var iteration = 0; iteration < 10; iteration++)
         {
@@ -151,7 +153,11 @@ public sealed class SimulatorTests
                 device.PlayAsync(new(1, scene.Id)).AsTask(),
                 device.PlayAsync(new(1, scene.Id)).AsTask(),
                 device.StopAsync(new(1)).AsTask(),
-                device.RestartAsync().AsTask());
+                device.RestartAsync().AsTask(),
+                device.UploadSceneAsync(scenePayload).AsTask(),
+                device.RenderAsync(TimeSpan.FromMilliseconds(iteration)).AsTask(),
+                device.SetBrightnessAsync(new(1, (byte)(100 + iteration))).AsTask(),
+                device.ReceiveFrameAsync(framePayload).AsTask());
             await device.PlayAsync(new(1, scene.Id));
         }
 
@@ -163,11 +169,40 @@ public sealed class SimulatorTests
         Assert.False(device.Status.IsPlaying);
     }
 
-    private static SimulatorDevice Device()
+    [Fact]
+    public async Task PlaybackFailureStopsRuntimeWithoutLeavingFaultedLoopState()
+    {
+        var store = new MemorySceneStore();
+        var scene = new Scene(Guid.NewGuid(), "Falla", 4, 2, TimeSpan.FromSeconds(2),
+            [new("content", [new FailAfterFirstRenderElement()])],
+            animations: [new(AnimationKind.Frame, TimeSpan.FromSeconds(2), repeat: true)]);
+        await store.SaveAsync(scene);
+        await store.SaveActiveSceneIdAsync(scene.Id);
+        var device = Device(store);
+
+        await device.BootAsync();
+        await Task.Delay(100);
+
+        Assert.False(device.Status.IsPlaying);
+        Assert.Null(device.Status.ActiveSceneId);
+        Assert.All(device.Snapshot.Pixels, pixel => Assert.False(pixel.IsOn));
+    }
+
+    private static SimulatorDevice Device(ISceneStore? store = null)
     {
         var topology = new MatrixTopology(4, 2,
             [new(0, 0, 2, 2, Layout: MatrixLayout.Serpentine, ChainIndex: 0),
              new(2, 0, 2, 2, Origin: MatrixOrigin.BottomRight, ChainIndex: 1)], ChannelOrder.Grb);
-        return new(new DeviceConfiguration("atlas-sim", topology));
+        return new(new DeviceConfiguration("atlas-sim", topology), store);
+    }
+
+    private sealed class FailAfterFirstRenderElement : ISceneElement
+    {
+        private int _renders;
+        public void Render(FrameBuffer target, TimeSpan position)
+        {
+            if (Interlocked.Increment(ref _renders) > 1) throw new InvalidOperationException("Render failed.");
+            target[0, 0] = new(255, 0, 0);
+        }
     }
 }

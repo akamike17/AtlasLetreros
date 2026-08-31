@@ -85,6 +85,27 @@ public sealed class PersistenceTests : IDisposable
     }
 
     [Fact]
+    public async Task DeletedOrReplacedFilesAndTwoStoresRemainControlled()
+    {
+        var original = Scene();
+        var replacement = new Scene(original.Id, "Reemplazo", 2, 2, TimeSpan.FromSeconds(1),
+            [new("content", [new PixelElement(1, 1, new(0, 255, 0))])]);
+        var first = new AtomicFileSceneStore(_root);
+        var second = new AtomicFileSceneStore(_root);
+
+        await Task.WhenAll(first.SaveAsync(original).AsTask(), second.SaveAsync(replacement).AsTask());
+        Assert.Contains((await first.LoadAsync(original.Id))!.Name, new[] { original.Name, replacement.Name });
+
+        var path = Directory.GetFiles(_root, "scene-*.json").Single();
+        File.Delete(path);
+        Assert.Null(await second.LoadAsync(original.Id));
+
+        await first.SaveAsync(original);
+        await File.WriteAllTextAsync(path, "{}");
+        await Assert.ThrowsAsync<InvalidDataException>(async () => await second.LoadAsync(original.Id));
+    }
+
+    [Fact]
     public async Task MissingStateAndSceneReturnNull()
     {
         var store = new AtomicFileSceneStore(_root);

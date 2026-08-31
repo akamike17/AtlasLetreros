@@ -8,7 +8,7 @@ namespace AtlasLetrero.Infrastructure;
 
 public sealed class AtomicFileSceneStore : ISceneStore
 {
-    private const long MaximumEnvelopeBytes = 24L * 1024 * 1024;
+    private const long MaximumEnvelopeBytes = ((SceneProtocolCodec.MaximumSceneBytes + 2L) / 3L * 4L) + 512L;
     private const long MaximumStateBytes = 4096;
     private readonly string _root;
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -26,6 +26,8 @@ public sealed class AtomicFileSceneStore : ISceneStore
         var payload = SceneProtocolCodec.Encode(scene);
         var envelope = new StoredEnvelope(Convert.ToHexString(SHA256.HashData(payload)), payload);
         var bytes = JsonSerializer.SerializeToUtf8Bytes(envelope, ProtocolJson.Options);
+        if (bytes.LongLength > MaximumEnvelopeBytes)
+            throw new InvalidDataException("Stored data exceeds the supported size.");
         await _gate.WaitAsync(cancellationToken);
         try { await WriteAtomicAsync(ScenePath(scene.Id), bytes, cancellationToken); }
         finally { _gate.Release(); }
@@ -48,6 +50,7 @@ public sealed class AtomicFileSceneStore : ISceneStore
                 throw new InvalidDataException("Stored scene checksum is invalid.");
             return SceneProtocolCodec.Decode(envelope.Payload);
         }
+        catch (FileNotFoundException) { return null; }
         catch (Exception exception) when (exception is JsonException or FormatException or ProtocolException)
         { throw new InvalidDataException("Stored scene is corrupt or incompatible.", exception); }
         finally { _gate.Release(); }
@@ -72,6 +75,7 @@ public sealed class AtomicFileSceneStore : ISceneStore
             ProtocolJson.ValidateVersion(state.ProtocolVersion);
             return state.ActiveSceneId;
         }
+        catch (FileNotFoundException) { return null; }
         catch (Exception exception) when (exception is JsonException or ProtocolException)
         { throw new InvalidDataException("Stored state is corrupt or incompatible.", exception); }
         finally { _gate.Release(); }
