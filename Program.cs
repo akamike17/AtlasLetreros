@@ -3,6 +3,7 @@ using AtlasLetrero.Application;
 using AtlasLetrero.Domain;
 using AtlasLetrero.Simulator;
 using AtlasLetrero.Infrastructure;
+using AtlasLetreros.Controllers;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Logging.ClearProviders();
@@ -19,6 +20,9 @@ var sceneDirectory = Path.Combine(builder.Environment.ContentRootPath, ".runtime
 var simulator = new SimulatorDevice(new DeviceConfiguration("atlas-simulator", topology, 184), new AtomicFileSceneStore(sceneDirectory));
 await simulator.BootAsync();
 builder.Services.AddSingleton(simulator);
+builder.Services.AddSingleton<IDeviceDiscovery, UdpLanDiscovery>();
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton<DeviceCatalog>();
 
 var app = builder.Build();
 

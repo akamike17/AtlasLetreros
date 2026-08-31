@@ -125,9 +125,21 @@ public sealed record SceneElementDocument(SceneElementKind Kind, int X, int Y, i
     int Width, int Height, int Radius, Pixel Color, bool Fill, string? Text = null,
     int LetterSpacing = 0, FontDocument? Font = null, int? OutputGlyphWidth = null,
     int? OutputGlyphHeight = null, bool Scroll = false, long ScrollPeriodMilliseconds = 0,
-    bool TransparentOff = true, ImageDocument? Image = null, int LineSpacing = 1)
+    bool TransparentOff = true, ImageDocument? Image = null, int LineSpacing = 1,
+    long StartMilliseconds = 0, long? DurationMilliseconds = null,
+    ElementAnimationKind ElementAnimation = ElementAnimationKind.None, double AnimationSpeed = 8,
+    long BlinkPeriodMilliseconds = 1000)
 {
-    public ISceneElement ToDomain() => Kind switch
+    public ISceneElement ToDomain()
+    {
+        var element = ToBaseDomain();
+        if (StartMilliseconds == 0 && DurationMilliseconds is null && ElementAnimation == ElementAnimationKind.None) return element;
+        return new TimedElement(element, TimeSpan.FromMilliseconds(StartMilliseconds),
+            DurationMilliseconds is { } duration ? TimeSpan.FromMilliseconds(duration) : null,
+            ElementAnimation, AnimationSpeed, TimeSpan.FromMilliseconds(BlinkPeriodMilliseconds));
+    }
+
+    private ISceneElement ToBaseDomain() => Kind switch
     {
         SceneElementKind.Pixel => new PixelElement(X, Y, Color),
         SceneElementKind.Rectangle => new RectangleElement(X, Y, Width, Height, Color, Fill),
@@ -142,7 +154,17 @@ public sealed record SceneElementDocument(SceneElementKind Kind, int X, int Y, i
         _ => throw new ProtocolException("Scene element kind is unsupported.")
     };
 
-    public static SceneElementDocument FromDomain(ISceneElement element) => element switch
+    public static SceneElementDocument FromDomain(ISceneElement element)
+    {
+        if (element is not TimedElement timed) return FromBaseDomain(element);
+        var value = FromBaseDomain(timed.Element);
+        return value with { StartMilliseconds = checked((long)timed.Start.TotalMilliseconds),
+            DurationMilliseconds = timed.Duration is { } duration ? checked((long)duration.TotalMilliseconds) : null,
+            ElementAnimation = timed.AnimationKind, AnimationSpeed = timed.AnimationSpeed,
+            BlinkPeriodMilliseconds = checked((long)timed.BlinkPeriod.TotalMilliseconds) };
+    }
+
+    private static SceneElementDocument FromBaseDomain(ISceneElement element) => element switch
     {
         PixelElement value => new(SceneElementKind.Pixel, value.X, value.Y, 0, 0, 0, 0, 0, value.Color, false),
         RectangleElement value => new(SceneElementKind.Rectangle, value.X, value.Y, 0, 0, value.Width, value.Height, 0, value.Color, value.Fill),

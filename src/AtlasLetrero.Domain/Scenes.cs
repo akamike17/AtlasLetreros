@@ -36,6 +36,47 @@ public interface ISceneElement
     void Render(FrameBuffer target, TimeSpan position);
 }
 
+public enum ElementAnimationKind { None, Marquee, Blink }
+
+public sealed record TimedElement : ISceneElement
+{
+    public TimedElement(ISceneElement element, TimeSpan start, TimeSpan? duration = null,
+        ElementAnimationKind animationKind = ElementAnimationKind.None, double animationSpeed = 8,
+        TimeSpan? blinkPeriod = null)
+    {
+        Element = element ?? throw new ArgumentNullException(nameof(element));
+        if (start < TimeSpan.Zero || duration <= TimeSpan.Zero || animationSpeed <= 0 || !double.IsFinite(animationSpeed))
+            throw new ArgumentOutOfRangeException(nameof(start));
+        if (!Enum.IsDefined(animationKind) || blinkPeriod <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(animationKind));
+        Start = start; Duration = duration; AnimationKind = animationKind; AnimationSpeed = animationSpeed;
+        BlinkPeriod = blinkPeriod ?? TimeSpan.FromSeconds(1);
+    }
+    public ISceneElement Element { get; }
+    public TimeSpan Start { get; }
+    public TimeSpan? Duration { get; }
+    public ElementAnimationKind AnimationKind { get; }
+    public double AnimationSpeed { get; }
+    public TimeSpan BlinkPeriod { get; }
+
+    public void Render(FrameBuffer target, TimeSpan position)
+    {
+        if (position < Start || Duration is { } duration && position >= Start + duration) return;
+        var local = position - Start;
+        if (AnimationKind == ElementAnimationKind.Blink && local.Ticks % BlinkPeriod.Ticks >= BlinkPeriod.Ticks / 2) return;
+        if (AnimationKind == ElementAnimationKind.None || AnimationKind == ElementAnimationKind.Blink)
+        { Element.Render(target, local); return; }
+
+        var source = new FrameBuffer(target.Width, target.Height, target.ColorModel);
+        Element.Render(source, local);
+        var offset = -(int)Math.Floor(local.TotalSeconds * AnimationSpeed) % target.Width;
+        for (var y = 0; y < source.Height; y++) for (var x = 0; x < source.Width; x++)
+        {
+            var pixel = source[x, y]; if (pixel == Pixel.Off) continue;
+            target.TrySetPixel((x + offset % target.Width + target.Width) % target.Width, y, pixel);
+        }
+    }
+}
+
 public sealed record PixelElement(int X, int Y, Pixel Color) : ISceneElement
 {
     public void Render(FrameBuffer target, TimeSpan position) => target.TrySetPixel(X, Y, Color);

@@ -131,7 +131,12 @@ public static class DiscoveryProtocol
     }
 }
 
-public sealed class UdpLanDiscovery(int port = DiscoveryProtocol.DefaultPort)
+public interface IDeviceDiscovery
+{
+    ValueTask<IReadOnlyList<DiscoveredDevice>> DiscoverAsync(TimeSpan timeout, CancellationToken cancellationToken = default);
+}
+
+public sealed class UdpLanDiscovery(int port = DiscoveryProtocol.DefaultPort) : IDeviceDiscovery
 {
     public async ValueTask<IReadOnlyList<DiscoveredDevice>> DiscoverAsync(TimeSpan timeout, CancellationToken cancellationToken = default)
     {
