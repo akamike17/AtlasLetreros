@@ -136,6 +136,33 @@ public sealed class SimulatorTests
         Assert.All(device.Snapshot.Pixels, pixel => Assert.False(pixel.IsOn));
     }
 
+    [Fact]
+    public async Task ConcurrentPlayStopAndRestartKeepSingleStablePlaybackLifecycle()
+    {
+        var device = Device(); await device.BootAsync();
+        var scene = new Scene(Guid.NewGuid(), "Estrés", 4, 2, TimeSpan.FromSeconds(2),
+            [new("content", [new PixelElement(0, 0, new(255, 0, 0))])],
+            animations: [new(AnimationKind.Frame, TimeSpan.FromSeconds(2), repeat: true)]);
+        await device.UploadSceneAsync(SceneProtocolCodec.Encode(scene));
+
+        for (var iteration = 0; iteration < 10; iteration++)
+        {
+            await Task.WhenAll(
+                device.PlayAsync(new(1, scene.Id)).AsTask(),
+                device.PlayAsync(new(1, scene.Id)).AsTask(),
+                device.StopAsync(new(1)).AsTask(),
+                device.RestartAsync().AsTask());
+            await device.PlayAsync(new(1, scene.Id));
+        }
+
+        await Task.Delay(150);
+        Assert.True(device.Status.IsPlaying);
+        Assert.Equal(scene.Id, device.Status.ActiveSceneId);
+        Assert.InRange(device.Snapshot.FrameNumber, 1, 8);
+        await device.StopAsync(new(1));
+        Assert.False(device.Status.IsPlaying);
+    }
+
     private static SimulatorDevice Device()
     {
         var topology = new MatrixTopology(4, 2,

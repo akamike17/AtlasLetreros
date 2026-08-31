@@ -10,6 +10,7 @@ public sealed class SimulatorDevice
     private ControllerRuntime _runtime;
     private CancellationTokenSource? _playbackCancellation;
     private Task? _playbackTask;
+    private readonly SemaphoreSlim _playbackGate = new(1, 1);
 
     public SimulatorDevice(DeviceConfiguration configuration, ISceneStore? store = null)
     {
@@ -45,15 +46,26 @@ public sealed class SimulatorDevice
     public async ValueTask PlayAsync(PlayRequest request, CancellationToken cancellationToken = default)
     {
         ProtocolJson.ValidateVersion(request.ProtocolVersion);
-        await _runtime.PlayAsync(request.SceneId, cancellationToken);
-        StartPlaybackLoop();
+        await _playbackGate.WaitAsync(cancellationToken);
+        try
+        {
+            await StopPlaybackLoopAsync();
+            await _runtime.PlayAsync(request.SceneId, cancellationToken);
+            StartPlaybackLoop();
+        }
+        finally { _playbackGate.Release(); }
     }
 
     public async ValueTask StopAsync(StopRequest request, CancellationToken cancellationToken = default)
     {
         ProtocolJson.ValidateVersion(request.ProtocolVersion);
-        await StopPlaybackLoopAsync();
-        await _runtime.StopAsync(cancellationToken);
+        await _playbackGate.WaitAsync(cancellationToken);
+        try
+        {
+            await StopPlaybackLoopAsync();
+            await _runtime.StopAsync(cancellationToken);
+        }
+        finally { _playbackGate.Release(); }
     }
 
     public async ValueTask SetBrightnessAsync(BrightnessRequest request, CancellationToken cancellationToken = default)
@@ -74,16 +86,20 @@ public sealed class SimulatorDevice
 
     public async ValueTask RestartAsync(CancellationToken cancellationToken = default)
     {
-        await StopPlaybackLoopAsync();
-        Driver = new VirtualDisplayDriver();
-        _runtime = new(Driver, _store);
-        await BootAsync(cancellationToken);
+        await _playbackGate.WaitAsync(cancellationToken);
+        try
+        {
+            await StopPlaybackLoopAsync();
+            Driver = new VirtualDisplayDriver();
+            _runtime = new(Driver, _store);
+            await _runtime.BootAsync(Configuration, cancellationToken);
+            if (_runtime.Status.IsPlaying) StartPlaybackLoop();
+        }
+        finally { _playbackGate.Release(); }
     }
 
     private void StartPlaybackLoop()
     {
-        _playbackCancellation?.Cancel();
-        _playbackCancellation?.Dispose();
         _playbackCancellation = new();
         var token = _playbackCancellation.Token;
         _playbackTask = Task.Run(async () =>

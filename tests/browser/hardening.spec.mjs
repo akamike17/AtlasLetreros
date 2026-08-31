@@ -513,12 +513,11 @@ test.describe('AtlasLetrero hardening / pruebas destructivas', () => {
     await expect(page.locator('#canvasInfo')).toContainText('64 × 16');
     await expect(page.locator('#objectList')).toContainText('SEMANTICO');
 
-    let payload;
-    page.on('request', request => { if (request.url().endsWith('/api/scene')) payload = request.postDataJSON(); });
-    page.once('dialog', dialog => dialog.accept());
+    let sceneRequests = 0;
+    page.on('request', request => { if (request.url().endsWith('/api/scene')) sceneRequests++; });
     await page.getByRole('button', { name: 'Enviar', exact: true }).click();
-    await expect.poll(() => payload).toBeTruthy();
-    expect(payload.scene.layers.flatMap(layer => layer.elements).some(element => element.kind === 4)).toBeTruthy();
+    await expect(page.locator('#toast')).toHaveText('El diseño es 64×16 y el dispositivo es 32×16.');
+    expect(sceneRequests).toBe(0);
   });
 
   test('device select usa selectedDevice real y sólo registra el simulador local', async ({ page }) => {

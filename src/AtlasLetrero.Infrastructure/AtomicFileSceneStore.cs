@@ -8,6 +8,8 @@ namespace AtlasLetrero.Infrastructure;
 
 public sealed class AtomicFileSceneStore : ISceneStore
 {
+    private const long MaximumEnvelopeBytes = 24L * 1024 * 1024;
+    private const long MaximumStateBytes = 4096;
     private readonly string _root;
     private readonly SemaphoreSlim _gate = new(1, 1);
 
@@ -37,8 +39,10 @@ public sealed class AtomicFileSceneStore : ISceneStore
         await _gate.WaitAsync(cancellationToken);
         try
         {
-            var envelope = JsonSerializer.Deserialize<StoredEnvelope>(await File.ReadAllBytesAsync(path, cancellationToken), ProtocolJson.Options)
+            var envelope = JsonSerializer.Deserialize<StoredEnvelope>(await ReadBoundedAsync(path, MaximumEnvelopeBytes, cancellationToken), ProtocolJson.Options)
                 ?? throw new InvalidDataException("Stored scene envelope is empty.");
+            if (envelope.Payload is null || string.IsNullOrWhiteSpace(envelope.Sha256) || envelope.Sha256.Length != 64)
+                throw new InvalidDataException("Stored scene envelope is incomplete.");
             var checksum = Convert.ToHexString(SHA256.HashData(envelope.Payload));
             if (!CryptographicOperations.FixedTimeEquals(Convert.FromHexString(checksum), Convert.FromHexString(envelope.Sha256)))
                 throw new InvalidDataException("Stored scene checksum is invalid.");
@@ -63,7 +67,7 @@ public sealed class AtomicFileSceneStore : ISceneStore
         await _gate.WaitAsync(cancellationToken);
         try
         {
-            var state = JsonSerializer.Deserialize<ActiveState>(await File.ReadAllBytesAsync(StatePath, cancellationToken), ProtocolJson.Options)
+            var state = JsonSerializer.Deserialize<ActiveState>(await ReadBoundedAsync(StatePath, MaximumStateBytes, cancellationToken), ProtocolJson.Options)
                 ?? throw new InvalidDataException("Stored state is empty.");
             ProtocolJson.ValidateVersion(state.ProtocolVersion);
             return state.ActiveSceneId;
@@ -89,6 +93,16 @@ public sealed class AtomicFileSceneStore : ISceneStore
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
 
-    private sealed record StoredEnvelope(string Sha256, byte[] Payload);
+    private static async Task<byte[]> ReadBoundedAsync(string path, long maximumBytes, CancellationToken cancellationToken)
+    {
+        await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096,
+            FileOptions.Asynchronous | FileOptions.SequentialScan);
+        if (stream.Length > maximumBytes) throw new InvalidDataException("Stored data exceeds the supported size.");
+        var bytes = new byte[checked((int)stream.Length)];
+        await stream.ReadExactlyAsync(bytes, cancellationToken);
+        return bytes;
+    }
+
+    private sealed record StoredEnvelope(string? Sha256, byte[]? Payload);
     private sealed record ActiveState(int ProtocolVersion, Guid? ActiveSceneId);
 }

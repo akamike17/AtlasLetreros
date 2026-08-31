@@ -43,6 +43,47 @@ public sealed class PersistenceTests : IDisposable
         await Assert.ThrowsAsync<InvalidDataException>(async () => await store.LoadAsync(scene.Id));
     }
 
+    [Theory]
+    [InlineData("{")]
+    [InlineData("{}")]
+    [InlineData("null")]
+    [InlineData("{\"sha256\":null,\"payload\":\"AA==\"}")]
+    [InlineData("{\"sha256\":\"not-a-checksum\",\"payload\":\"AA==\"}")]
+    [InlineData("{\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"payload\":null}")]
+    public async Task MalformedSceneEnvelopesFailAsInvalidData(string contents)
+    {
+        var scene = Scene();
+        Directory.CreateDirectory(_root);
+        await File.WriteAllTextAsync(Path.Combine(_root, $"scene-{scene.Id:N}.json"), contents);
+        var store = new AtomicFileSceneStore(_root);
+        await Assert.ThrowsAsync<InvalidDataException>(async () => await store.LoadAsync(scene.Id));
+    }
+
+    [Fact]
+    public async Task OversizedSceneEnvelopeIsRejectedBeforeAllocation()
+    {
+        var scene = Scene();
+        Directory.CreateDirectory(_root);
+        var path = Path.Combine(_root, $"scene-{scene.Id:N}.json");
+        await using (var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write))
+            stream.SetLength(25L * 1024 * 1024);
+        var store = new AtomicFileSceneStore(_root);
+        await Assert.ThrowsAsync<InvalidDataException>(async () => await store.LoadAsync(scene.Id));
+    }
+
+    [Theory]
+    [InlineData("{")]
+    [InlineData("null")]
+    [InlineData("{}")]
+    [InlineData("{\"protocolVersion\":99,\"activeSceneId\":null}")]
+    public async Task CorruptActiveStateFailsAsInvalidData(string contents)
+    {
+        Directory.CreateDirectory(_root);
+        await File.WriteAllTextAsync(Path.Combine(_root, "active-state.json"), contents);
+        var store = new AtomicFileSceneStore(_root);
+        await Assert.ThrowsAsync<InvalidDataException>(async () => await store.LoadActiveSceneIdAsync());
+    }
+
     [Fact]
     public async Task MissingStateAndSceneReturnNull()
     {
