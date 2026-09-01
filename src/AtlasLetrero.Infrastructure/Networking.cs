@@ -136,7 +136,7 @@ public interface IDeviceDiscovery
     ValueTask<IReadOnlyList<DiscoveredDevice>> DiscoverAsync(TimeSpan timeout, CancellationToken cancellationToken = default);
 }
 
-public sealed class UdpLanDiscovery(int port = DiscoveryProtocol.DefaultPort) : IDeviceDiscovery
+public sealed class UdpLanDiscovery(int port = DiscoveryProtocol.DefaultPort, IPAddress? broadcastAddress = null) : IDeviceDiscovery
 {
     public async ValueTask<IReadOnlyList<DiscoveredDevice>> DiscoverAsync(TimeSpan timeout, CancellationToken cancellationToken = default)
     {
@@ -144,7 +144,7 @@ public sealed class UdpLanDiscovery(int port = DiscoveryProtocol.DefaultPort) : 
         using var client = new UdpClient(AddressFamily.InterNetwork) { EnableBroadcast = true };
         client.Client.Bind(new IPEndPoint(IPAddress.Any, 0));
         var query = Encoding.ASCII.GetBytes(DiscoveryProtocol.Query);
-        await client.SendAsync(query, new IPEndPoint(IPAddress.Broadcast, port), cancellationToken);
+        await client.SendAsync(query, new IPEndPoint(broadcastAddress ?? IPAddress.Broadcast, port), cancellationToken);
         using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutSource.CancelAfter(timeout);
         var devices = new Dictionary<string, DiscoveredDevice>(StringComparer.OrdinalIgnoreCase);

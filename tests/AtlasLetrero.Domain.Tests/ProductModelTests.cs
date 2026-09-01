@@ -79,6 +79,30 @@ public sealed class ProductModelTests
             true, false, new(1, 0, 0)));
     }
 
+    [Fact]
+    public void IndependentObjectTimingMarqueeAndBlinkRenderBeforeDuringAndAfter()
+    {
+        var fixedPixel = new TimedElement(new PixelElement(0, 0, new(255, 0, 0)), TimeSpan.Zero,
+            TimeSpan.FromSeconds(6));
+        var marquee = new TimedElement(new PixelElement(3, 0, new(0, 255, 0)), TimeSpan.Zero,
+            TimeSpan.FromSeconds(6), ElementAnimationKind.Marquee, 1);
+        var blink = new TimedElement(new PixelElement(2, 0, new(0, 0, 255)), TimeSpan.FromSeconds(6),
+            TimeSpan.FromSeconds(3), ElementAnimationKind.Blink, blinkPeriod: TimeSpan.FromSeconds(1));
+        var scene = new Scene(Guid.NewGuid(), "acceptance", 4, 1, TimeSpan.FromSeconds(9),
+            [new("objects", [fixedPixel, marquee, blink])]);
+
+        var before = SceneEngine.Render(scene, TimeSpan.FromMilliseconds(1500));
+        var blinkOn = SceneEngine.Render(scene, TimeSpan.FromSeconds(6.25));
+        var blinkOff = SceneEngine.Render(scene, TimeSpan.FromSeconds(6.75));
+        var after = SceneEngine.Render(scene, TimeSpan.FromSeconds(8.75));
+
+        Assert.Equal(new Pixel(255, 0, 0), before[0, 0]);
+        Assert.Equal(new Pixel(0, 255, 0), before[2, 0]);
+        Assert.Equal(new Pixel(0, 0, 255), blinkOn[2, 0]);
+        Assert.Equal(Pixel.Off, blinkOff[2, 0]);
+        Assert.All(after.Pixels.ToArray(), pixel => Assert.Equal(Pixel.Off, pixel));
+    }
+
     private static Device Device(string serial)
     {
         var topology = new MatrixTopology(16, 16, [new(0, 0, 16, 16, Layout: MatrixLayout.Serpentine)]);

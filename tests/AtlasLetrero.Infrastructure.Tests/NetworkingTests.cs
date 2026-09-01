@@ -1,4 +1,6 @@
 using System.Net;
+using System.Net.Sockets;
+using System.Diagnostics;
 using System.Text;
 using AtlasLetrero.Domain;
 using AtlasLetrero.Infrastructure;
@@ -73,6 +75,65 @@ public sealed class NetworkingTests
         await Assert.ThrowsAsync<ControllerCommunicationException>(async () => await client.GetStatusAsync());
     }
 
+    [Fact]
+    public async Task UdpDiscoveryDeduplicatesAndIsolatesMalformedAnnouncements()
+    {
+        using var responder = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0));
+        var port = ((IPEndPoint)responder.Client.LocalEndPoint!).Port;
+        var responseTask = Task.Run(async () =>
+        {
+            var query = await responder.ReceiveAsync();
+            Assert.Equal(DiscoveryProtocol.Query, Encoding.ASCII.GetString(query.Buffer));
+            await responder.SendAsync(Encoding.UTF8.GetBytes("malformed"), query.RemoteEndPoint);
+            var first = new DiscoveredDevice("atlas-1", "first", IPAddress.Loopback, 80, 1, "1.0");
+            var updated = first with { HostName = "updated" };
+            await responder.SendAsync(DiscoveryProtocol.EncodeAnnouncement(first), query.RemoteEndPoint);
+            await responder.SendAsync(DiscoveryProtocol.EncodeAnnouncement(updated), query.RemoteEndPoint);
+        });
+
+        var devices = await new UdpLanDiscovery(port, IPAddress.Loopback)
+            .DiscoverAsync(TimeSpan.FromMilliseconds(200));
+        await responseTask;
+
+        var device = Assert.Single(devices);
+        Assert.Equal("atlas-1", device.DeviceId);
+        Assert.Equal("updated", device.HostName);
+    }
+
+    [Fact]
+    public async Task UdpDiscoveryHonorsBoundedTimeoutWithoutResponses()
+    {
+        using var unused = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0));
+        var port = ((IPEndPoint)unused.Client.LocalEndPoint!).Port;
+        var stopwatch = Stopwatch.StartNew();
+
+        var devices = await new UdpLanDiscovery(port, IPAddress.Loopback)
+            .DiscoverAsync(TimeSpan.FromMilliseconds(100));
+
+        Assert.Empty(devices);
+        Assert.InRange(stopwatch.Elapsed, TimeSpan.FromMilliseconds(75), TimeSpan.FromSeconds(1));
+    }
+
+    [Fact]
+    public async Task ClientCoversCapabilitiesScenePlayStopAndBrightnessOnSameBaseAddress()
+    {
+        var handler = new RecordingHandler(request => request.RequestUri!.AbsolutePath == "/api/capabilities"
+            ? Json(new CapabilitiesResponse(1, "atlas", 1, 1, ColorModel.Rgb, ["scenes"], ["virtual"], 0))
+            : new(HttpStatusCode.NoContent) { Content = new ByteArrayContent([]) });
+        var client = new AtlasControllerClient(new HttpClient(handler) { BaseAddress = new("http://10.0.0.8:8080/") });
+        var scene = new Scene(Guid.NewGuid(), "scene", 1, 1, TimeSpan.FromSeconds(1),
+            [new("layer", [new PixelElement(0, 0, new Pixel(1, 2, 3))])]);
+
+        await client.GetCapabilitiesAsync();
+        await client.UploadSceneAsync(scene);
+        await client.PlayAsync(scene.Id);
+        await client.StopAsync();
+        await client.SetBrightnessAsync(17);
+
+        Assert.Equal(["/api/capabilities", "/api/scene", "/api/play", "/api/stop", "/api/brightness"], handler.Paths);
+        Assert.All(handler.Hosts, host => Assert.Equal("10.0.0.8:8080", host));
+    }
+
     private static HttpResponseMessage Json<T>(T value) => new(HttpStatusCode.OK)
     { Content = new ByteArrayContent(ProtocolJson.Serialize(value)) };
 
@@ -80,10 +141,12 @@ public sealed class NetworkingTests
     {
         public List<string> Paths { get; } = [];
         public List<string> Bodies { get; } = [];
+        public List<string> Hosts { get; } = [];
         public string? LastContentType { get; private set; }
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Paths.Add(request.RequestUri!.AbsolutePath);
+            Hosts.Add(request.RequestUri.Authority);
             if (request.Content is not null)
             {
                 LastContentType = request.Content.Headers.ContentType?.MediaType;

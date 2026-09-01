@@ -136,4 +136,36 @@ public sealed class ProtocolTests
         Assert.Equal(new Pixel(255, 255, 255), rendered[0, 0]);
         Assert.Equal(new Pixel(255, 255, 255), rendered[0, 4]);
     }
+
+    [Theory]
+    [InlineData(ElementAnimationKind.None)]
+    [InlineData(ElementAnimationKind.Marquee)]
+    [InlineData(ElementAnimationKind.Blink)]
+    public void TimedElementAnimationRoundTripsWithAllFields(ElementAnimationKind animation)
+    {
+        var source = new Scene(Guid.NewGuid(), "timed", 8, 1, TimeSpan.FromSeconds(9),
+            [new("layer", [new TimedElement(new PixelElement(3, 0, new Pixel(1, 2, 3)),
+                TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(4), animation, 6.5, TimeSpan.FromMilliseconds(750))])]);
+
+        var decoded = SceneProtocolCodec.Decode(SceneProtocolCodec.Encode(source));
+        var timed = Assert.IsType<TimedElement>(decoded.Layers.Single().Elements.Single());
+
+        Assert.Equal(TimeSpan.FromSeconds(2), timed.Start);
+        Assert.Equal(TimeSpan.FromSeconds(4), timed.Duration);
+        Assert.Equal(animation, timed.AnimationKind);
+        Assert.Equal(6.5, timed.AnimationSpeed);
+        Assert.Equal(TimeSpan.FromMilliseconds(750), timed.BlinkPeriod);
+    }
+
+    [Fact]
+    public void LegacyElementSerializationKeepsUntimedBehavior()
+    {
+        var scene = new Scene(Guid.NewGuid(), "legacy", 1, 1, TimeSpan.FromSeconds(1),
+            [new("layer", [new PixelElement(0, 0, new Pixel(9, 8, 7))])]);
+
+        var decoded = SceneProtocolCodec.Decode(SceneProtocolCodec.Encode(scene));
+
+        Assert.IsType<PixelElement>(decoded.Layers.Single().Elements.Single());
+        Assert.Equal(new Pixel(9, 8, 7), SceneEngine.Render(decoded, TimeSpan.Zero)[0, 0]);
+    }
 }

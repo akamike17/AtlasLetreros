@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using System.Net.Sockets;
 using AtlasLetrero.Infrastructure;
 using AtlasLetrero.Protocol;
 using AtlasLetrero.Simulator;
@@ -9,16 +9,23 @@ namespace AtlasLetreros.Controllers;
 
 public sealed class DeviceCatalog(IDeviceDiscovery discovery, IHttpClientFactory httpClientFactory)
 {
-    private readonly ConcurrentDictionary<string, DiscoveredDevice> _devices = new(StringComparer.OrdinalIgnoreCase);
+    private IReadOnlyDictionary<string, DiscoveredDevice> _devices = new Dictionary<string, DiscoveredDevice>(StringComparer.OrdinalIgnoreCase);
 
     public async Task<IReadOnlyList<DiscoveredDevice>> RefreshAsync(CancellationToken cancellationToken)
     {
-        foreach (var device in await discovery.DiscoverAsync(TimeSpan.FromMilliseconds(350), cancellationToken))
-            _devices[device.DeviceId] = device;
-        return _devices.Values.ToArray();
+        try
+        {
+            var devices = await discovery.DiscoverAsync(TimeSpan.FromMilliseconds(350), cancellationToken);
+            var current = devices.ToDictionary(device => device.DeviceId, StringComparer.OrdinalIgnoreCase);
+            Volatile.Write(ref _devices, current);
+            return current.Values.ToArray();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (Exception exception) when (exception is SocketException or IOException)
+        { return Volatile.Read(ref _devices).Values.ToArray(); }
     }
 
-    public bool TryResolve(string id, out DiscoveredDevice device) => _devices.TryGetValue(id, out device!);
+    public bool TryResolve(string id, out DiscoveredDevice device) => Volatile.Read(ref _devices).TryGetValue(id, out device!);
 
     public AtlasControllerClient CreateClient(DiscoveredDevice device)
     {
@@ -38,16 +45,17 @@ public sealed class DeviceController(SimulatorDevice simulator, DeviceCatalog ca
     {
         var result = new List<object> { DescribeSimulator() };
         var discovered = await catalog.RefreshAsync(cancellationToken);
-        foreach (var device in discovered)
+        var physical = await Task.WhenAll(discovered.Select(async device =>
         {
             try
             {
                 var capabilities = await catalog.CreateClient(device).GetCapabilitiesAsync(cancellationToken);
-                result.Add(DescribePhysical(device, true, capabilities));
+                return DescribePhysical(device, true, capabilities);
             }
-            catch (Exception exception) when (exception is ControllerCommunicationException or HttpRequestException or TaskCanceledException)
-            { result.Add(DescribePhysical(device, false, null)); }
-        }
+            catch (Exception exception) when (IsCommunicationFailure(exception))
+            { return DescribePhysical(device, false, null); }
+        }));
+        result.AddRange(physical);
         return Ok(result);
     }
 
@@ -56,7 +64,8 @@ public sealed class DeviceController(SimulatorDevice simulator, DeviceCatalog ca
     {
         if (IsSimulator(deviceId)) return Ok(simulator.GetCapabilities());
         if (!catalog.TryResolve(deviceId, out var device)) return UnknownDevice(deviceId);
-        return Ok(await catalog.CreateClient(device).GetCapabilitiesAsync(cancellationToken));
+        try { return Ok(await catalog.CreateClient(device).GetCapabilitiesAsync(cancellationToken)); }
+        catch (Exception exception) when (IsCommunicationFailure(exception)) { return Unavailable(deviceId); }
     }
 
     [HttpGet("{deviceId}/status")]
@@ -65,8 +74,9 @@ public sealed class DeviceController(SimulatorDevice simulator, DeviceCatalog ca
         if (IsSimulator(deviceId)) return Ok(new { protocolVersion = 1, device = simulator.GetCapabilities(), runtime = simulator.Status });
         if (!catalog.TryResolve(deviceId, out var device)) return UnknownDevice(deviceId);
         var client = catalog.CreateClient(device);
-        var status = await client.GetStatusAsync(cancellationToken);
-        var capabilities = await client.GetCapabilitiesAsync(cancellationToken);
+        StatusResponse status; CapabilitiesResponse capabilities;
+        try { status = await client.GetStatusAsync(cancellationToken); capabilities = await client.GetCapabilitiesAsync(cancellationToken); }
+        catch (Exception exception) when (IsCommunicationFailure(exception)) { return Unavailable(deviceId); }
         return Ok(new
         {
             protocolVersion = status.ProtocolVersion,
@@ -84,8 +94,9 @@ public sealed class DeviceController(SimulatorDevice simulator, DeviceCatalog ca
             snapshot = simulator.Snapshot, targetFramesPerSecond = 30, updatedAtUtc = DateTimeOffset.UtcNow });
         if (!catalog.TryResolve(deviceId, out var device)) return UnknownDevice(deviceId);
         var client = catalog.CreateClient(device);
-        var status = await client.GetStatusAsync(cancellationToken);
-        var capabilities = await client.GetCapabilitiesAsync(cancellationToken);
+        StatusResponse status; CapabilitiesResponse capabilities;
+        try { status = await client.GetStatusAsync(cancellationToken); capabilities = await client.GetCapabilitiesAsync(cancellationToken); }
+        catch (Exception exception) when (IsCommunicationFailure(exception)) { return Unavailable(deviceId); }
         return Ok(new { protocolVersion = 1, device = capabilities, runtime = new { isPlaying = status.IsPlaying,
             activeSceneId = status.ActiveSceneId, activeSceneName = (string?)null, brightness = status.Brightness,
             lastError = status.LastError, positionSeconds = 0d }, snapshot = (object?)null, updatedAtUtc = DateTimeOffset.UtcNow });
@@ -111,27 +122,33 @@ public sealed class DeviceController(SimulatorDevice simulator, DeviceCatalog ca
         {
             if (!catalog.TryResolve(deviceId, out var device)) return UnknownDevice(deviceId);
             var client = catalog.CreateClient(device);
-            var capabilities = await client.GetCapabilitiesAsync(cancellationToken);
+            CapabilitiesResponse capabilities;
+            try { capabilities = await client.GetCapabilitiesAsync(cancellationToken); }
+            catch (Exception exception) when (IsCommunicationFailure(exception)) { return Unavailable(deviceId); }
             if (!Compatible(scene, capabilities)) return Mismatch(scene, capabilities);
-            await client.UploadSceneAsync(scene, cancellationToken);
-            await client.SetBrightnessAsync(request.Brightness, cancellationToken);
-            await client.PlayAsync(scene.Id, cancellationToken);
+            try
+            {
+                await client.UploadSceneAsync(scene, cancellationToken);
+                await client.SetBrightnessAsync(request.Brightness, cancellationToken);
+                await client.PlayAsync(scene.Id, cancellationToken);
+            }
+            catch (Exception exception) when (IsCommunicationFailure(exception)) { return Unavailable(deviceId); }
         }
         return Ok(new { protocolVersion = 1, sceneId = scene.Id, playing = true });
     }
 
     [HttpPost("{deviceId}/play")]
     public async Task<IActionResult> Play(string deviceId, PlayRequest request, CancellationToken cancellationToken) =>
-        await Command(deviceId, client => client.PlayAsync(request.SceneId, cancellationToken),
+        request.ProtocolVersion != ProtocolVersions.Current ? IncompatibleProtocol() : await Command(deviceId, client => client.PlayAsync(request.SceneId, cancellationToken),
             () => simulator.PlayAsync(request, cancellationToken));
 
     [HttpPost("{deviceId}/stop")]
     public async Task<IActionResult> Stop(string deviceId, StopRequest request, CancellationToken cancellationToken) =>
-        await Command(deviceId, client => client.StopAsync(cancellationToken), () => simulator.StopAsync(request, cancellationToken));
+        request.ProtocolVersion != ProtocolVersions.Current ? IncompatibleProtocol() : await Command(deviceId, client => client.StopAsync(cancellationToken), () => simulator.StopAsync(request, cancellationToken));
 
     [HttpPost("{deviceId}/brightness")]
     public async Task<IActionResult> Brightness(string deviceId, BrightnessRequest request, CancellationToken cancellationToken) =>
-        await Command(deviceId, client => client.SetBrightnessAsync(request.Brightness, cancellationToken),
+        request.ProtocolVersion != ProtocolVersions.Current ? IncompatibleProtocol() : await Command(deviceId, client => client.SetBrightnessAsync(request.Brightness, cancellationToken),
             () => simulator.SetBrightnessAsync(request, cancellationToken));
 
     private async Task<IActionResult> Command(string id, Func<AtlasControllerClient, ValueTask> physical, Func<ValueTask> local)
@@ -140,7 +157,8 @@ public sealed class DeviceController(SimulatorDevice simulator, DeviceCatalog ca
         else
         {
             if (!catalog.TryResolve(id, out var device)) return UnknownDevice(id);
-            await physical(catalog.CreateClient(device));
+            try { await physical(catalog.CreateClient(device)); }
+            catch (Exception exception) when (IsCommunicationFailure(exception)) { return Unavailable(id); }
         }
         return NoContent();
     }
@@ -154,6 +172,9 @@ public sealed class DeviceController(SimulatorDevice simulator, DeviceCatalog ca
         firmware = device.FirmwareVersion, device.ProtocolVersion, capabilities };
     private static bool IsSimulator(string id) => string.Equals(id, "atlas-simulator", StringComparison.OrdinalIgnoreCase);
     private IActionResult UnknownDevice(string id) => ProblemResult(404, "UnknownDevice", $"Device '{id}' is not in the discovered catalog.");
+    private IActionResult Unavailable(string id) => ProblemResult(503, "DeviceUnavailable", $"Device '{id}' did not respond.");
+    private IActionResult IncompatibleProtocol() => ProblemResult(400, "ProtocolMismatch", "The request protocol version is not supported.");
+    private static bool IsCommunicationFailure(Exception exception) => exception is ControllerCommunicationException or HttpRequestException or TaskCanceledException or ProtocolException;
     private IActionResult Mismatch(AtlasLetrero.Domain.Scene scene, CapabilitiesResponse capabilities) =>
         ProblemResult(400, "CanvasMismatch", $"The scene is {scene.Width}x{scene.Height}; the device is {capabilities.Width}x{capabilities.Height}.");
     private static bool Compatible(AtlasLetrero.Domain.Scene scene, CapabilitiesResponse capabilities) =>
