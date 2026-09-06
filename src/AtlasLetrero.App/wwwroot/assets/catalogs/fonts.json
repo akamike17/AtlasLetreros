@@ -1,0 +1,34 @@
+[
+  {
+    "id": "5x7",
+    "displayName": "5x7 · Fixed",
+    "source": "X11 Fixed vía U8g2",
+    "license": "Public domain",
+    "version": "9a93ba2e383afb02313c4805b321316aa9b0d2da",
+    "path": "fonts/5x7.json"
+  },
+  {
+    "id": "5x8",
+    "displayName": "5x8 · Fixed",
+    "source": "X11 Fixed vía U8g2",
+    "license": "Public domain",
+    "version": "9a93ba2e383afb02313c4805b321316aa9b0d2da",
+    "path": "fonts/5x8.json"
+  },
+  {
+    "id": "6x10",
+    "displayName": "6x10 · Fixed",
+    "source": "X11 Fixed vía U8g2",
+    "license": "Public domain",
+    "version": "9a93ba2e383afb02313c4805b321316aa9b0d2da",
+    "path": "fonts/6x10.json"
+  },
+  {
+    "id": "8x13",
+    "displayName": "8x13 · Fixed",
+    "source": "X11 Fixed vía U8g2",
+    "license": "Public domain",
+    "version": "9a93ba2e383afb02313c4805b321316aa9b0d2da",
+    "path": "fonts/8x13.json"
+  }
+]

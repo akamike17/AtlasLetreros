@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+.vs/
+TestResults/
+artifacts/
+*.user
+.dotnet/
+.dotnet-home/
+.nuget-cache/
+.local/

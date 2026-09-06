@@ -1,0 +1,1 @@
+COPYRIGHT "Public domain terminal emulator font.  Share and enjoy."

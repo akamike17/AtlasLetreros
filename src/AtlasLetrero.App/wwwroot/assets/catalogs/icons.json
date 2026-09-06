@@ -1,0 +1,210 @@
+[
+  {
+    "id": "pc-display",
+    "displayName": "Computadora",
+    "source": "bootstrap-icons",
+    "version": "1.11.3",
+    "category": "Iconos",
+    "tags": [
+      "pc",
+      "computadora",
+      "monitor",
+      "reparación",
+      "tecnología"
+    ],
+    "path": "icons/bootstrap/pc-display.svg"
+  },
+  {
+    "id": "tools",
+    "displayName": "Herramientas",
+    "source": "bootstrap-icons",
+    "version": "1.11.3",
+    "category": "Iconos",
+    "tags": [
+      "taller",
+      "reparación",
+      "herramientas"
+    ],
+    "path": "icons/bootstrap/tools.svg"
+  },
+  {
+    "id": "wrench",
+    "displayName": "Llave",
+    "source": "bootstrap-icons",
+    "version": "1.11.3",
+    "category": "Iconos",
+    "tags": [
+      "taller",
+      "reparación",
+      "llave"
+    ],
+    "path": "icons/bootstrap/wrench.svg"
+  },
+  {
+    "id": "phone",
+    "displayName": "Teléfono",
+    "source": "bootstrap-icons",
+    "version": "1.11.3",
+    "category": "Iconos",
+    "tags": [
+      "celular",
+      "móvil",
+      "teléfono",
+      "reparación"
+    ],
+    "path": "icons/bootstrap/phone.svg"
+  },
+  {
+    "id": "cup-hot",
+    "displayName": "Café",
+    "source": "bootstrap-icons",
+    "version": "1.11.3",
+    "category": "Iconos",
+    "tags": [
+      "café",
+      "bebida",
+      "restaurante"
+    ],
+    "path": "icons/bootstrap/cup-hot.svg"
+  },
+  {
+    "id": "house",
+    "displayName": "Casa",
+    "source": "bootstrap-icons",
+    "version": "1.11.3",
+    "category": "Iconos",
+    "tags": [
+      "casa",
+      "hogar"
+    ],
+    "path": "icons/bootstrap/house.svg"
+  },
+  {
+    "id": "heart",
+    "displayName": "Corazón",
+    "source": "bootstrap-icons",
+    "version": "1.11.3",
+    "category": "Iconos",
+    "tags": [
+      "amor",
+      "corazón",
+      "salud"
+    ],
+    "path": "icons/bootstrap/heart.svg"
+  },
+  {
+    "id": "star",
+    "displayName": "Estrella",
+    "source": "bootstrap-icons",
+    "version": "1.11.3",
+    "category": "Iconos",
+    "tags": [
+      "estrella",
+      "destacado"
+    ],
+    "path": "icons/bootstrap/star.svg"
+  },
+  {
+    "id": "arrow-left",
+    "displayName": "Flecha izquierda",
+    "source": "bootstrap-icons",
+    "version": "1.11.3",
+    "category": "Iconos",
+    "tags": [
+      "flecha",
+      "dirección",
+      "izquierda"
+    ],
+    "path": "icons/bootstrap/arrow-left.svg"
+  },
+  {
+    "id": "arrow-right",
+    "displayName": "Flecha derecha",
+    "source": "bootstrap-icons",
+    "version": "1.11.3",
+    "category": "Iconos",
+    "tags": [
+      "flecha",
+      "dirección",
+      "derecha"
+    ],
+    "path": "icons/bootstrap/arrow-right.svg"
+  },
+  {
+    "id": "wifi",
+    "displayName": "Wi-Fi",
+    "source": "bootstrap-icons",
+    "version": "1.11.3",
+    "category": "Iconos",
+    "tags": [
+      "internet",
+      "red",
+      "tecnología"
+    ],
+    "path": "icons/bootstrap/wifi.svg"
+  },
+  {
+    "id": "printer",
+    "displayName": "Impresora",
+    "source": "bootstrap-icons",
+    "version": "1.11.3",
+    "category": "Iconos",
+    "tags": [
+      "impresora",
+      "copias",
+      "tecnología"
+    ],
+    "path": "icons/bootstrap/printer.svg"
+  },
+  {
+    "id": "shop",
+    "displayName": "Tienda",
+    "source": "bootstrap-icons",
+    "version": "1.11.3",
+    "category": "Iconos",
+    "tags": [
+      "tienda",
+      "negocio",
+      "comercio"
+    ],
+    "path": "icons/bootstrap/shop.svg"
+  },
+  {
+    "id": "car-front",
+    "displayName": "Automóvil",
+    "source": "bootstrap-icons",
+    "version": "1.11.3",
+    "category": "Iconos",
+    "tags": [
+      "auto",
+      "coche",
+      "taller"
+    ],
+    "path": "icons/bootstrap/car-front.svg"
+  },
+  {
+    "id": "bicycle",
+    "displayName": "Bicicleta",
+    "source": "bootstrap-icons",
+    "version": "1.11.3",
+    "category": "Iconos",
+    "tags": [
+      "bici",
+      "bicicleta"
+    ],
+    "path": "icons/bootstrap/bicycle.svg"
+  },
+  {
+    "id": "lightning",
+    "displayName": "Rayo",
+    "source": "bootstrap-icons",
+    "version": "1.11.3",
+    "category": "Iconos",
+    "tags": [
+      "rayo",
+      "electricidad",
+      "energía"
+    ],
+    "path": "icons/bootstrap/lightning.svg"
+  }
+]

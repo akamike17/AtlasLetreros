@@ -1,0 +1,134 @@
+[
+  {
+    "id": "1f600",
+    "displayName": "Sonrisa",
+    "source": "twemoji",
+    "version": "v14.0.2",
+    "category": "Emojis",
+    "tags": [
+      "sonrisa"
+    ],
+    "path": "emoji/twemoji/1f600.svg"
+  },
+  {
+    "id": "1f4bb",
+    "displayName": "Computadora",
+    "source": "twemoji",
+    "version": "v14.0.2",
+    "category": "Emojis",
+    "tags": [
+      "computadora"
+    ],
+    "path": "emoji/twemoji/1f4bb.svg"
+  },
+  {
+    "id": "1f527",
+    "displayName": "Llave",
+    "source": "twemoji",
+    "version": "v14.0.2",
+    "category": "Emojis",
+    "tags": [
+      "llave"
+    ],
+    "path": "emoji/twemoji/1f527.svg"
+  },
+  {
+    "id": "2764",
+    "displayName": "Corazón",
+    "source": "twemoji",
+    "version": "v14.0.2",
+    "category": "Emojis",
+    "tags": [
+      "corazón"
+    ],
+    "path": "emoji/twemoji/2764.svg"
+  },
+  {
+    "id": "1f525",
+    "displayName": "Fuego",
+    "source": "twemoji",
+    "version": "v14.0.2",
+    "category": "Emojis",
+    "tags": [
+      "fuego"
+    ],
+    "path": "emoji/twemoji/1f525.svg"
+  },
+  {
+    "id": "2615",
+    "displayName": "Café",
+    "source": "twemoji",
+    "version": "v14.0.2",
+    "category": "Emojis",
+    "tags": [
+      "café"
+    ],
+    "path": "emoji/twemoji/2615.svg"
+  },
+  {
+    "id": "1f355",
+    "displayName": "Pizza",
+    "source": "twemoji",
+    "version": "v14.0.2",
+    "category": "Emojis",
+    "tags": [
+      "pizza"
+    ],
+    "path": "emoji/twemoji/1f355.svg"
+  },
+  {
+    "id": "1f697",
+    "displayName": "Automóvil",
+    "source": "twemoji",
+    "version": "v14.0.2",
+    "category": "Emojis",
+    "tags": [
+      "automóvil"
+    ],
+    "path": "emoji/twemoji/1f697.svg"
+  },
+  {
+    "id": "1f31f",
+    "displayName": "Estrella",
+    "source": "twemoji",
+    "version": "v14.0.2",
+    "category": "Emojis",
+    "tags": [
+      "estrella"
+    ],
+    "path": "emoji/twemoji/1f31f.svg"
+  },
+  {
+    "id": "1f44d",
+    "displayName": "Me gusta",
+    "source": "twemoji",
+    "version": "v14.0.2",
+    "category": "Emojis",
+    "tags": [
+      "me gusta"
+    ],
+    "path": "emoji/twemoji/1f44d.svg"
+  },
+  {
+    "id": "1f389",
+    "displayName": "Celebración",
+    "source": "twemoji",
+    "version": "v14.0.2",
+    "category": "Emojis",
+    "tags": [
+      "celebración"
+    ],
+    "path": "emoji/twemoji/1f389.svg"
+  },
+  {
+    "id": "1f4a1",
+    "displayName": "Idea",
+    "source": "twemoji",
+    "version": "v14.0.2",
+    "category": "Emojis",
+    "tags": [
+      "idea"
+    ],
+    "path": "emoji/twemoji/1f4a1.svg"
+  }
+]

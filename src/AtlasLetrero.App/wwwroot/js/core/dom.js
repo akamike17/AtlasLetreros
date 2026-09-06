@@ -1,0 +1,4 @@
+export const $=(selector,root=document)=>root.querySelector(selector);
+export function el(tag,attrs={},...children){const node=document.createElement(tag);for(const [key,value] of Object.entries(attrs)){if(key.startsWith('on'))node.addEventListener(key.slice(2),value);else if(key==='class')node.className=value;else if(key==='text')node.textContent=value;else if(value!==false&&value!=null)node.setAttribute(key,value===true?'':value);}node.append(...children.flat().filter(v=>v!=null));return node;}
+export function toast(message,error=false){document.querySelector('.toast')?.remove();const n=el('div',{class:'toast'+(error?' error':''),role:error?'alert':'status',text:message});document.body.append(n);setTimeout(()=>n.remove(),5000);}
+export function safe(action){return async(...args)=>{try{await action(...args);}catch(error){toast(error.message,true);}};}

@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "AtlasLetrero.App": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:62473;http://localhost:62474"
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "atlas-letrero-tests",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node tests/AtlasLetrero.Tests/render-regression.mjs" }
+}
