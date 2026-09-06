@@ -1,0 +1,20 @@
+<Solution>
+  <Project Path="AtlasLetreros.csproj" />
+  <Folder Name="/src/">
+    <Project Path="src/AtlasLetrero.Domain/AtlasLetrero.Domain.csproj" />
+    <Project Path="src/AtlasLetrero.Application/AtlasLetrero.Application.csproj" />
+    <Project Path="src/AtlasLetrero.Protocol/AtlasLetrero.Protocol.csproj" />
+    <Project Path="src/AtlasLetrero.Infrastructure/AtlasLetrero.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/simulator/">
+    <Project Path="simulator/AtlasLetrero.Simulator/AtlasLetrero.Simulator.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AtlasLetrero.Application.Tests/AtlasLetrero.Application.Tests.csproj" />
+    <Project Path="tests/AtlasLetrero.Protocol.Tests/AtlasLetrero.Protocol.Tests.csproj" />
+    <Project Path="tests/AtlasLetrero.Simulator.Tests/AtlasLetrero.Simulator.Tests.csproj" />
+    <Project Path="tests/AtlasLetrero.Infrastructure.Tests/AtlasLetrero.Infrastructure.Tests.csproj" />
+    <Project Path="tests/AtlasLetrero.Domain.Tests/AtlasLetrero.Domain.Tests.csproj" />
+    <Project Path="tests/AtlasLetrero.IntegrationTests/AtlasLetrero.IntegrationTests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "author": "AtlasLetrero",
+  "editor": "wokwi",
+  "parts": [
+    { "id": "esp", "type": "wokwi-esp32-devkit-v1", "top": 0, "left": 0, "attrs": {} },
+    { "id": "matrix", "type": "wokwi-led-matrix", "top": -110, "left": 260, "attrs": { "rows": "16", "cols": "16", "layout": "serpentine", "pixelShape": "square", "pixelSize": "5050" } }
+  ],
+  "connections": [
+    [ "esp:5", "matrix:DIN", "green", [] ],
+    [ "esp:VIN", "matrix:VDD", "red", [] ],
+    [ "esp:GND.1", "matrix:VSS", "black", [] ]
+  ]
+}

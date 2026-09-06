@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AtlasLetrero.Application\AtlasLetrero.Application.csproj" />
+    <ProjectReference Include="..\..\src\AtlasLetrero.Domain\AtlasLetrero.Domain.csproj" />
+    <ProjectReference Include="..\..\src\AtlasLetrero.Protocol\AtlasLetrero.Protocol.csproj" />
+  </ItemGroup>
+</Project>

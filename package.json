@@ -1,0 +1,10 @@
+{
+  "name": "atlas-letrero-browser-tests",
+  "private": true,
+  "scripts": {
+    "test:e2e": "powershell -NoProfile -ExecutionPolicy Bypass -File tests/browser/run-e2e.ps1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0"
+  }
+}

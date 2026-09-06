@@ -1,0 +1,20 @@
+#include "atlas/playlist_scheduler.hpp"
+#include <algorithm>
+
+namespace atlas { namespace {
+bool valid(const Playlist&p){if(p.id.empty()||p.items.empty()||p.items.size()>1024)return false;return std::all_of(p.items.begin(),p.items.end(),[](const auto&i){return!i.scene_id.empty()&&i.duration_milliseconds>0;});}
+bool valid(const Schedule&s){return!s.id.empty()&&!s.playlist_id.empty()&&s.weekdays_mask!=0&&s.start_minute<1440&&s.end_minute<=1440&&s.start_minute!=s.end_minute;}
+bool active_now(const Schedule&s,std::uint8_t day,std::uint16_t minute){if(!s.enabled)return false;if(s.start_minute<s.end_minute)return(s.weekdays_mask&(1u<<day))&&minute>=s.start_minute&&minute<s.end_minute;const auto previous=static_cast<std::uint8_t>((day+6)%7);return((s.weekdays_mask&(1u<<day))&&minute>=s.start_minute)||((s.weekdays_mask&(1u<<previous))&&minute<s.end_minute);}
+}
+PlaylistScheduler::PlaylistScheduler(ControllerRuntime&r,IConfigurationStore&s,const ISchedulerClock&c):runtime_(r),storage_(s),clock_(c){}
+const Playlist* PlaylistScheduler::find_playlist(std::string_view id)const noexcept{const auto i=std::find_if(playlists_.begin(),playlists_.end(),[id](const auto&p){return p.id==id;});return i==playlists_.end()?nullptr:&*i;}
+const Schedule* PlaylistScheduler::select_schedule()const noexcept{if(!clock_.synchronized())return nullptr;const Schedule*best=nullptr;for(const auto&s:schedules_)if(active_now(s,clock_.weekday(),clock_.minute_of_day())&&find_playlist(s.playlist_id)&&(best==nullptr||s.priority>best->priority||(s.priority==best->priority&&s.id<best->id)))best=&s;return best;}
+bool PlaylistScheduler::boot(){playlists_=storage_.load_playlists();schedules_=storage_.load_schedules();if(const auto*s=select_schedule())return activate(*find_playlist(s->playlist_id),s->id);const auto stored=storage_.load_active_playlist_id();return stored&&find_playlist(*stored)?activate(*find_playlist(*stored),{}):true;}
+bool PlaylistScheduler::save(const Playlist&p){if(!valid(p)||!storage_.save_playlist(p))return false;const auto i=std::find_if(playlists_.begin(),playlists_.end(),[&p](const auto&v){return v.id==p.id;});if(i==playlists_.end())playlists_.push_back(p);else *i=p;return true;}
+bool PlaylistScheduler::save(const Schedule&s){if(!valid(s)||!find_playlist(s.playlist_id)||!storage_.save_schedule(s))return false;const auto i=std::find_if(schedules_.begin(),schedules_.end(),[&s](const auto&v){return v.id==s.id;});if(i==schedules_.end())schedules_.push_back(s);else *i=s;return true;}
+bool PlaylistScheduler::activate(const Playlist&p,std::string_view schedule){active_playlist_=p.id;active_schedule_=schedule;item_index_=0;item_started_=clock_.milliseconds();exhausted_=false;if(!storage_.save_active_playlist_id(p.id)||!runtime_.play_stored(p.items[0].scene_id)){active_playlist_.clear();active_schedule_.clear();return false;}runtime_.set_active_program(active_playlist_,active_schedule_);return true;}
+bool PlaylistScheduler::play(std::string_view id){const auto*p=find_playlist(id);return p&&activate(*p,{});}
+bool PlaylistScheduler::advance(bool force){const auto*p=find_playlist(active_playlist_);if(!p||exhausted_)return false;const auto now=clock_.milliseconds();if(!force&&now-item_started_<p->items[item_index_].duration_milliseconds)return true;if(++item_index_>=p->items.size()){if(!p->repeat){exhausted_=true;runtime_.stop();return false;}item_index_=0;}item_started_=now;return runtime_.play_stored(p->items[item_index_].scene_id);}
+bool PlaylistScheduler::tick(){if(clock_.synchronized()){if(const auto*s=select_schedule()){if(s->id!=active_schedule_)return activate(*find_playlist(s->playlist_id),s->id);}else if(!active_schedule_.empty()){stop();return true;}}return advance(false);}
+void PlaylistScheduler::stop()noexcept{runtime_.stop();active_playlist_.clear();active_schedule_.clear();runtime_.set_active_program({},{});}std::string_view PlaylistScheduler::active_playlist_id()const noexcept{return active_playlist_;}std::string_view PlaylistScheduler::active_schedule_id()const noexcept{return active_schedule_;}
+} // namespace atlas

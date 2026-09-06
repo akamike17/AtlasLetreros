@@ -1,0 +1,4 @@
+[wokwi]
+version = 1
+firmware = '../esp-idf/build/flasher_args.json'
+elf = '../esp-idf/build/atlas_letrero_native.elf'
