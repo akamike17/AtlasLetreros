@@ -1,0 +1,1 @@
+.device-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:24px}.device-info{display:grid;grid-template-columns:1fr 1fr;gap:15px;margin:24px 0}.device-info dt{color:var(--muted)}.device-info dd{margin:0}.device-grid .actions{flex-wrap:wrap}

@@ -1,0 +1,3 @@
+import {newProject,importProject} from '../app.js';import {api} from '../core/api-client.js';import {$,el,button} from '../core/dom.js';import {guard} from '../core/errors.js';
+$('#new-project').onclick=newProject;$('#import-project').onclick=importProject;
+guard(async()=>{const projects=await api('projects');$('#recent').replaceChildren(...projects.slice(0,5).map(p=>el('a',{class:'project-row',href:'/editor.html?id='+p.id},el('strong',{text:p.name}),el('span',{text:p.matrixConfiguration.width+' × '+p.matrixConfiguration.height}),el('span',{text:new Date(p.modifiedUtc).toLocaleDateString('es-MX')}),el('span',{text:'Abrir →'}))));if(!projects.length)$('#recent').append(el('p',{class:'muted',text:'Tu primer letrero empieza con un proyecto nuevo.'}));})();

@@ -1,0 +1,1 @@
+export function rectanglePoints(a,b){const p=[],left=Math.min(a.x,b.x),right=Math.max(a.x,b.x),top=Math.min(a.y,b.y),bottom=Math.max(a.y,b.y);for(let x=left;x<=right;x++)p.push({x,y:top},{x,y:bottom});for(let y=top;y<=bottom;y++)p.push({x:left,y},{x:right,y});return p;}

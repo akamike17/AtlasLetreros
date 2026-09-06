@@ -1,0 +1,6 @@
+const cache=new Map();
+export async function loadFont(id){if(cache.has(id))return cache.get(id);let font;
+ if(id==='8x8'){const files=await Promise.all(['basic','ext_latin'].map(async n=>(await fetch('/assets/fonts/font8x8_'+n+'.h')).text()));const glyphs={};for(let n=0;n<files.length;n++){const rows=[...files[n].matchAll(/\{\s*((?:0x[0-9A-Fa-f]+,?\s*){8})\}/g)];rows.forEach((r,i)=>{const bytes=r[1].match(/0x[0-9a-f]+/gi).map(x=>parseInt(x));glyphs[i+(n?160:0)]={w:8,h:8,x:0,y:0,rows:bytes.map(b=>Array.from({length:8},(_,x)=>(b>>x)&1))};});}font={width:8,height:8,ascent:8,glyphs};}
+ else {const response=await fetch('/assets/fonts/'+id+'.bdf');if(!response.ok)throw new Error('No se encontró la fuente LED.');const text=await response.text();const box=text.match(/FONTBOUNDINGBOX (\d+) (\d+) (-?\d+) (-?\d+)/);font={width:+box[1],height:+box[2],ascent:+box[2]+(+box[4]),glyphs:{}};for(const part of text.split('STARTCHAR ').slice(1)){const code=+part.match(/ENCODING (\d+)/)?.[1];const b=part.match(/BBX (\d+) (\d+) (-?\d+) (-?\d+)/);const bitmap=part.match(/BITMAP\s*([\s\S]*?)ENDCHAR/);if(!b||!bitmap)continue;const w=+b[1],h=+b[2];font.glyphs[code]={w,h,x:+b[3],y:+b[4],rows:bitmap[1].trim().split(/\s+/).slice(0,h).map(row=>Array.from({length:w},(_,x)=>(parseInt(row,16)>>((row.length*4)-1-x))&1))};}}
+ cache.set(id,font);return font;
+}

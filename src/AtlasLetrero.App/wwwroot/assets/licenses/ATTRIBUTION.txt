@@ -1,0 +1,1 @@
+Bootstrap Icons © The Bootstrap Authors, MIT. Tabler Icons © Paweł Kuna, MIT. Twemoji graphics © Twitter, Inc and other contributors, CC-BY 4.0. https://twemoji.twitter.com/ https://creativecommons.org/licenses/by/4.0/ X11 bitmap fonts: individual public-domain notices. font8x8: Daniel Hepper, Public Domain. Inter: Rasmus Andersson, SIL OFL 1.1.

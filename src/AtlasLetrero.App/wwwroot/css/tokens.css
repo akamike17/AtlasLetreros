@@ -1,0 +1,2 @@
+@font-face{font-family:Inter;src:url('/assets/fonts/Inter.ttf') format('truetype');font-weight:100 900;font-display:swap}
+:root{font-family:Inter,Arial,sans-serif;color:#e7edf5;background:#0b101a;font-size:13px;--panel:#121b29;--line:#283448;--muted:#91a1b8;--accent:#61e7bf;--text:#e7edf5;--radius:12px;color-scheme:dark}

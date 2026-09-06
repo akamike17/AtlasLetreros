@@ -1,0 +1,32 @@
+[
+  {
+    "path": "fonts/5x7.bdf",
+    "displayName": "5x7 clásico",
+    "license": "Dominio público (X11)",
+    "id": "5x7"
+  },
+  {
+    "path": "fonts/5x8.bdf",
+    "displayName": "5x8 clásico",
+    "license": "Dominio público (X11)",
+    "id": "5x8"
+  },
+  {
+    "path": "fonts/6x10.bdf",
+    "displayName": "6x10 clásico",
+    "license": "Dominio público (X11)",
+    "id": "6x10"
+  },
+  {
+    "path": "fonts/8x13.bdf",
+    "displayName": "8x13 clásico",
+    "license": "Dominio público (X11)",
+    "id": "8x13"
+  },
+  {
+    "path": "fonts/font8x8_basic.h",
+    "displayName": "8x8 clásico",
+    "license": "Dominio público",
+    "id": "8x8"
+  }
+]

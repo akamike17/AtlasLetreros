@@ -1,0 +1,1 @@
+export function ellipsePoints(a,b){const cx=(a.x+b.x)/2,cy=(a.y+b.y)/2,rx=Math.abs(b.x-a.x)/2,ry=Math.abs(b.y-a.y)/2,points=[];const n=Math.max(8,Math.ceil(Math.PI*2*Math.max(rx,ry)*2));for(let i=0;i<n;i++){const angle=i/n*Math.PI*2;points.push({x:Math.round(cx+rx*Math.cos(angle)),y:Math.round(cy+ry*Math.sin(angle))});}return points;}

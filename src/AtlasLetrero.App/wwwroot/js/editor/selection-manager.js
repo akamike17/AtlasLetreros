@@ -1,0 +1,1 @@
+export function hitTest(layers,p){for(const l of [...layers].sort((a,b)=>b.order-a.order)){if(!l.visible||l.locked)continue;for(const o of [...l.objects].reverse())if(o.visible&&p.x>=o.x&&p.x<o.x+o.width&&p.y>=o.y&&p.y<o.y+o.height)return {layer:l,object:o};}return null;}

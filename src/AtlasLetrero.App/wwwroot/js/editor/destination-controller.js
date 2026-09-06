@@ -1,0 +1,6 @@
+import {$,el,button} from '../core/dom.js';import {api} from '../core/api-client.js';import {modal} from '../core/dialog.js';import {guard} from '../core/errors.js';
+export class DestinationController {
+ constructor(){this.status={connected:false};$('#detect-device').onclick=guard(()=>this.detect());}
+ async refresh(){this.status=await api('devices/status');$('#destination-device').textContent=this.status.connected?'● ESP32 conectado':'○ Sin dispositivo';$('#destination option[value=serial]').disabled=!this.status.connected;if(!this.status.connected&&$('#destination').value==='serial')$('#destination').value='simulator';}
+ async detect(){$('#destination-device').textContent='Detectando…';const ports=await api('devices/serial');await this.refresh();const verified=ports.filter(p=>p.verified);if(!verified.length){$('#status').textContent=ports.length?'Ningún puerto respondió como AtlasLED.':'No se encontraron puertos seriales.';return;}const select=el('select',{},...verified.map(p=>el('option',{value:p.port,text:p.port+' · AtlasLED'})));modal('Elegir dispositivo',el('div',{},el('p',{text:'Puertos verificados por el protocolo AtlasLED.'}),select),async()=>{await api('devices/connect','POST',{port:select.value});await this.refresh();$('#destination').value='serial';},'Conectar');}
+}

@@ -1,0 +1,242 @@
+[
+  {
+    "path": "icons/bootstrap/printer.svg",
+    "id": "bootstrap-icons-printer",
+    "source": "bootstrap-icons",
+    "displayName": "Impresora",
+    "tags": [
+      "printer",
+      "Impresora",
+      "letrero"
+    ],
+    "category": "Tecnología"
+  },
+  {
+    "path": "icons/bootstrap/shop.svg",
+    "id": "bootstrap-icons-shop",
+    "source": "bootstrap-icons",
+    "displayName": "Tienda",
+    "tags": [
+      "shop",
+      "Tienda",
+      "letrero"
+    ],
+    "category": "General"
+  },
+  {
+    "path": "icons/bootstrap/clock.svg",
+    "id": "bootstrap-icons-clock",
+    "source": "bootstrap-icons",
+    "displayName": "Horario",
+    "tags": [
+      "clock",
+      "Horario",
+      "letrero"
+    ],
+    "category": "General"
+  },
+  {
+    "path": "icons/bootstrap/heart-fill.svg",
+    "id": "bootstrap-icons-heart-fill",
+    "source": "bootstrap-icons",
+    "displayName": "Corazón",
+    "tags": [
+      "heart-fill",
+      "Corazón",
+      "letrero"
+    ],
+    "category": "General"
+  },
+  {
+    "path": "icons/bootstrap/cup-hot.svg",
+    "id": "bootstrap-icons-cup-hot",
+    "source": "bootstrap-icons",
+    "displayName": "Café",
+    "tags": [
+      "cup-hot",
+      "Café",
+      "letrero"
+    ],
+    "category": "General"
+  },
+  {
+    "path": "icons/bootstrap/star-fill.svg",
+    "id": "bootstrap-icons-star-fill",
+    "source": "bootstrap-icons",
+    "displayName": "Estrella",
+    "tags": [
+      "star-fill",
+      "Estrella",
+      "letrero"
+    ],
+    "category": "General"
+  },
+  {
+    "path": "icons/bootstrap/tools.svg",
+    "id": "bootstrap-icons-tools",
+    "source": "bootstrap-icons",
+    "displayName": "Reparación",
+    "tags": [
+      "tools",
+      "Reparación",
+      "letrero"
+    ],
+    "category": "General"
+  },
+  {
+    "path": "icons/bootstrap/laptop.svg",
+    "id": "bootstrap-icons-laptop",
+    "source": "bootstrap-icons",
+    "displayName": "Portátil",
+    "tags": [
+      "laptop",
+      "Portátil",
+      "letrero"
+    ],
+    "category": "Tecnología"
+  },
+  {
+    "path": "icons/bootstrap/pc-display.svg",
+    "id": "bootstrap-icons-pc-display",
+    "source": "bootstrap-icons",
+    "displayName": "Computadora",
+    "tags": [
+      "pc-display",
+      "Computadora",
+      "letrero"
+    ],
+    "category": "Tecnología"
+  },
+  {
+    "path": "icons/bootstrap/envelope.svg",
+    "id": "bootstrap-icons-envelope",
+    "source": "bootstrap-icons",
+    "displayName": "Correo",
+    "tags": [
+      "envelope",
+      "Correo",
+      "letrero"
+    ],
+    "category": "General"
+  },
+  {
+    "path": "icons/bootstrap/wifi.svg",
+    "id": "bootstrap-icons-wifi",
+    "source": "bootstrap-icons",
+    "displayName": "Internet",
+    "tags": [
+      "wifi",
+      "Internet",
+      "letrero"
+    ],
+    "category": "Tecnología"
+  },
+  {
+    "path": "icons/bootstrap/phone.svg",
+    "id": "bootstrap-icons-phone",
+    "source": "bootstrap-icons",
+    "displayName": "Teléfono",
+    "tags": [
+      "phone",
+      "Teléfono",
+      "letrero"
+    ],
+    "category": "Tecnología"
+  },
+  {
+    "path": "icons/tabler/home.svg",
+    "id": "tabler-icons-home",
+    "source": "tabler-icons",
+    "displayName": "Casa",
+    "tags": [
+      "home",
+      "Casa",
+      "letrero"
+    ],
+    "category": "General"
+  },
+  {
+    "path": "icons/tabler/bulb.svg",
+    "id": "tabler-icons-bulb",
+    "source": "tabler-icons",
+    "displayName": "Luz",
+    "tags": [
+      "bulb",
+      "Luz",
+      "letrero"
+    ],
+    "category": "General"
+  },
+  {
+    "path": "icons/tabler/pizza.svg",
+    "id": "tabler-icons-pizza",
+    "source": "tabler-icons",
+    "displayName": "Pizza",
+    "tags": [
+      "pizza",
+      "Pizza",
+      "letrero"
+    ],
+    "category": "General"
+  },
+  {
+    "path": "icons/tabler/car.svg",
+    "id": "tabler-icons-car",
+    "source": "tabler-icons",
+    "displayName": "Automóvil",
+    "tags": [
+      "car",
+      "Automóvil",
+      "letrero"
+    ],
+    "category": "General"
+  },
+  {
+    "path": "icons/tabler/device-mobile.svg",
+    "id": "tabler-icons-device-mobile",
+    "source": "tabler-icons",
+    "displayName": "Celular",
+    "tags": [
+      "device-mobile",
+      "Celular",
+      "letrero"
+    ],
+    "category": "Tecnología"
+  },
+  {
+    "path": "icons/tabler/device-desktop.svg",
+    "id": "tabler-icons-device-desktop",
+    "source": "tabler-icons",
+    "displayName": "Monitor",
+    "tags": [
+      "device-desktop",
+      "Monitor",
+      "letrero"
+    ],
+    "category": "Tecnología"
+  },
+  {
+    "path": "icons/tabler/cpu.svg",
+    "id": "tabler-icons-cpu",
+    "source": "tabler-icons",
+    "displayName": "Procesador",
+    "tags": [
+      "cpu",
+      "Procesador",
+      "letrero"
+    ],
+    "category": "Tecnología"
+  },
+  {
+    "path": "icons/tabler/arrow-right.svg",
+    "id": "tabler-icons-arrow-right",
+    "source": "tabler-icons",
+    "displayName": "Flecha derecha",
+    "tags": [
+      "arrow-right",
+      "Flecha derecha",
+      "letrero"
+    ],
+    "category": "General"
+  }
+]

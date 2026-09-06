@@ -1,0 +1,162 @@
+[
+  {
+    "path": "emoji/1f3e0.svg",
+    "id": "emoji-1f3e0",
+    "source": "twemoji",
+    "displayName": "Casa",
+    "tags": [
+      "Casa"
+    ],
+    "category": "Emoji"
+  },
+  {
+    "path": "emoji/2705.svg",
+    "id": "emoji-2705",
+    "source": "twemoji",
+    "displayName": "Correcto",
+    "tags": [
+      "Correcto"
+    ],
+    "category": "Emoji"
+  },
+  {
+    "path": "emoji/1f527.svg",
+    "id": "emoji-1f527",
+    "source": "twemoji",
+    "displayName": "Llave herramienta",
+    "tags": [
+      "Llave herramienta"
+    ],
+    "category": "Emoji"
+  },
+  {
+    "path": "emoji/1f697.svg",
+    "id": "emoji-1f697",
+    "source": "twemoji",
+    "displayName": "Automóvil",
+    "tags": [
+      "Automóvil"
+    ],
+    "category": "Emoji"
+  },
+  {
+    "path": "emoji/1f525.svg",
+    "id": "emoji-1f525",
+    "source": "twemoji",
+    "displayName": "Fuego",
+    "tags": [
+      "Fuego"
+    ],
+    "category": "Emoji"
+  },
+  {
+    "path": "emoji/1f680.svg",
+    "id": "emoji-1f680",
+    "source": "twemoji",
+    "displayName": "Cohete",
+    "tags": [
+      "Cohete"
+    ],
+    "category": "Emoji"
+  },
+  {
+    "path": "emoji/1f355.svg",
+    "id": "emoji-1f355",
+    "source": "twemoji",
+    "displayName": "Pizza comida",
+    "tags": [
+      "Pizza comida"
+    ],
+    "category": "Emoji"
+  },
+  {
+    "path": "emoji/1f4bb.svg",
+    "id": "emoji-1f4bb",
+    "source": "twemoji",
+    "displayName": "Computadora portátil",
+    "tags": [
+      "Computadora portátil"
+    ],
+    "category": "Emoji"
+  },
+  {
+    "path": "emoji/1f600.svg",
+    "id": "emoji-1f600",
+    "source": "twemoji",
+    "displayName": "Sonrisa",
+    "tags": [
+      "Sonrisa"
+    ],
+    "category": "Emoji"
+  },
+  {
+    "path": "emoji/2615.svg",
+    "id": "emoji-2615",
+    "source": "twemoji",
+    "displayName": "Café",
+    "tags": [
+      "Café"
+    ],
+    "category": "Emoji"
+  },
+  {
+    "path": "emoji/1f4a1.svg",
+    "id": "emoji-1f4a1",
+    "source": "twemoji",
+    "displayName": "Idea luz",
+    "tags": [
+      "Idea luz"
+    ],
+    "category": "Emoji"
+  },
+  {
+    "path": "emoji/1f44d.svg",
+    "id": "emoji-1f44d",
+    "source": "twemoji",
+    "displayName": "Pulgar arriba",
+    "tags": [
+      "Pulgar arriba"
+    ],
+    "category": "Emoji"
+  },
+  {
+    "path": "emoji/2764.svg",
+    "id": "emoji-2764",
+    "source": "twemoji",
+    "displayName": "Corazón",
+    "tags": [
+      "Corazón"
+    ],
+    "category": "Emoji"
+  },
+  {
+    "path": "emoji/1f31f.svg",
+    "id": "emoji-1f31f",
+    "source": "twemoji",
+    "displayName": "Estrella",
+    "tags": [
+      "Estrella"
+    ],
+    "category": "Emoji"
+  },
+  {
+    "path": "emoji/1f6e0.svg",
+    "id": "emoji-1f6e0",
+    "source": "twemoji",
+    "displayName": "Reparación herramientas",
+    "tags": [
+      "Reparación herramientas"
+    ],
+    "category": "Emoji"
+  },
+  {
+    "path": "emoji/1f389.svg",
+    "id": "emoji-1f389",
+    "source": "twemoji",
+    "displayName": "Fiesta",
+    "tags": [
+      "Fiesta"
+    ],
+    "category": "Emoji"
+  }
+]
