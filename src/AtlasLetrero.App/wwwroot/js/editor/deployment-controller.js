@@ -24,7 +24,6 @@ export class PhysicalTransport {
  constructor(){this.lastChecksum=null;}
  async receive(bytes,expected,signal){const packet=JSON.parse(new TextDecoder().decode(bytes));const response=await fetch('/api/devices/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({checksum:expected,packet}),signal});const result=await response.json();if(!response.ok||result.checksum!==expected||result.verified!==true||result.activated===true)throw new Error(result.message||'El firmware no confirmó la verificación.');this.lastChecksum=result.checksum;return result.checksum;}
  async activate(checksum,signal){if(this.lastChecksum!==checksum)throw new Error('El ESP32 no confirmó el checksum verificado.');const response=await fetch('/api/devices/activate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({checksum}),signal});const result=await response.json();if(!response.ok||result.checksum!==checksum||result.activated!==true)throw new Error(result.message||'El firmware no confirmó la activación.');this.lastChecksum=null;}
- activate(checksum){if(this.lastChecksum!==checksum)throw new Error('El ESP32 no confirmó el checksum activo.');}
 }
 export async function deploy(project,scene,transport,notify,signal,canActivate=()=>true){
  try{

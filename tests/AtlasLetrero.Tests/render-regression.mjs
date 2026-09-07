@@ -82,4 +82,23 @@ await assert.rejects(new PhysicalTransport().receive(new TextEncoder().encode('{
 globalThis.fetch=async()=>({ok:true,json:async()=>({checksum:'0'.repeat(64),verified:false,activated:false})});
 await assert.rejects(new PhysicalTransport().receive(new TextEncoder().encode('{}'),'0'.repeat(64)),/verificación/);
 globalThis.fetch=originalFetch;
+const physicalProject=structuredClone(project),physicalScene=structuredClone(scene);
+let activateCalls=0;
+globalThis.fetch=async(url,options)=>{
+ if(url==='/api/devices/upload')return {ok:true,json:async()=>({checksum:JSON.parse(options.body).checksum,verified:true,activated:false})};
+ if(url==='/api/devices/activate'){activateCalls++;return {ok:true,json:async()=>({checksum:JSON.parse(options.body).checksum,activated:true})};}
+ throw new Error('URL inesperada: '+url);
+};
+const physical=new PhysicalTransport();
+await deploy(physicalProject,physicalScene,physical,()=>{});
+assert.equal(activateCalls,1,'deploy debe activar el transporte físico exactamente una vez');
+const cancelled=new AbortController();
+const cancelledPhysical=new PhysicalTransport();
+await assert.rejects(deploy(physicalProject,physicalScene,cancelledPhysical,status=>{if(status==='Activando')cancelled.abort();},cancelled.signal),{name:'AbortError'});
+assert.equal(activateCalls,1,'la cancelación antes de activate no debe llamar al endpoint');
+const rejectedPhysical=new PhysicalTransport();
+await assert.rejects(deploy(physicalProject,physicalScene,rejectedPhysical,()=>{},undefined,()=>false),/cambió/);
+assert.equal(activateCalls,1,'canActivate() === false no debe llamar al endpoint');
+globalThis.fetch=originalFetch;
+console.log('PASS: transporte físico verifica y activa una sola vez; cancelación y canActivate() bloquean la activación.');
 console.log('BLOCKED BY HARDWARE: transporte físico sólo pasa con ESP32 AtlasLED y ACK/VERIFY/ACTIVATE reales.');
