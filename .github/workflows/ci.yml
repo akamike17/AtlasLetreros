@@ -12,7 +12,8 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: '20.x' }
       - run: npm test
-      - run: dotnet restore src/AtlasLetrero.App/AtlasLetrero.App.csproj
+      - run: powershell -ExecutionPolicy Bypass -File tools/verify-assets.ps1
       - run: dotnet restore tests/AtlasLetrero.E2E/AtlasLetrero.E2E.csproj
-      - run: dotnet build src/AtlasLetrero.App/AtlasLetrero.App.csproj -c Release --no-restore
       - run: dotnet build tests/AtlasLetrero.E2E/AtlasLetrero.E2E.csproj -c Release --no-restore
+      - run: pwsh tests/AtlasLetrero.E2E/bin/Release/net8.0/playwright.ps1 install chromium
+      - run: powershell -ExecutionPolicy Bypass -File tools/smoke.ps1

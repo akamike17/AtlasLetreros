@@ -13,3 +13,9 @@ Comprobaciones de cada entrega:
 5. Verificar que `/api/health` informa versión y que la aplicación escucha sólo en loopback.
 
 El firmware físico no se declara listo hasta completar una prueba HIL documentada.
+
+## Estado de la entrega
+
+El CI ejecuta ahora el smoke E2E completo. El envío físico está conectado al servicio Serial y sólo habilita el destino después de un handshake AtlasLED válido; valida capacidades y conserva el principio validar → preparar → enviar → verificar → activar. Sin ESP32 real, el estado correcto es `BLOCKED BY HARDWARE`.
+
+La versión sigue siendo beta Windows. La prueba E2E, el build Release y la verificación de assets deben ejecutarse antes de cada entrega.

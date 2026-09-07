@@ -50,3 +50,13 @@ La captura original mostraba el defecto corregido: el objeto de texto tenía `78
 - Consola del navegador durante la pasada: 0 errores.
 - El envío al simulador terminó con `Paquete recibido 96×16 · 12 FPS`, `SHA-256 024b39c07567…`, progreso 100 y `Correcto`.
 - La regresión JS también valida escala/altura inválida, texto vacío y dimensiones calculadas del rasterizador; ejecución final: `PASS`.
+
+## Verificación física y CI — 2026-09-07
+
+- `npm test`: PASS. Incluye render, efectos, cancelación, corrupción, último envío válido, guardado concurrente y errores del transporte físico sin hardware.
+- Build Release con SDK local `8.0.424`: PASS, 0 errores.
+- `tools/verify-assets.ps1`: PASS.
+- `tools/smoke.ps1`: la prueba E2E confirma el flujo software y responsive; la expectativa del simulador se ajustó para exigir paquete enviado antes de comparar sus píxeles.
+- CI actualizado para ejecutar `tools/smoke.ps1`, no sólo compilar el proyecto E2E.
+- Editor → API → `DeviceConnectionService` → Serial implementado con PREPARE/CHUNK/VERIFY/ACTIVATE, límites de capacidades y rechazo sin activar ante error.
+- Hardware: BLOQUEADO POR HARDWARE. No hay ESP32 AtlasLED conectado; no se declara PASS físico.

@@ -1,4 +1,5 @@
 using AtlasLetrero.App.Services;
+using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Mvc;
 namespace AtlasLetrero.App.Controllers;
 [ApiController, Route("api/devices")]
@@ -7,6 +8,12 @@ public sealed class DevicesController(DeviceConnectionService device) : Controll
     [HttpGet("serial")]public object Serial()=>new { ports=device.Ports() };
     [HttpGet("status")]public object Status()=>device.Status;
     [HttpPost("virtual/connect")]public object ConnectVirtual()=>device.ConnectVirtual();
+    [HttpPost("upload"), RequestSizeLimit(8 * 1024 * 1024)] public object Upload(JsonObject request)
+    {
+        var checksum=request["checksum"]?.GetValue<string>() ?? throw new InvalidDataException("Falta checksum.");
+        var packet=request["packet"] as JsonObject ?? throw new InvalidDataException("Falta paquete.");
+        var actual=device.Upload(packet,checksum); return new { checksum=actual, activated=true };
+    }
     public sealed record ConnectRequest(string Port);
     [HttpPost("connect")]public IActionResult Connect(ConnectRequest request)
     {

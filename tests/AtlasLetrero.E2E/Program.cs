@@ -28,9 +28,10 @@ async Task Value(string label, string value)
     await input.FillAsync(value);
     await input.PressAsync("Tab");
 }
-async Task VisiblePixels(string label)
+async Task VisiblePixels(string label, bool requireSimulator = false)
 {
-    await page.WaitForFunctionAsync("() => { const a=document.querySelector('#design-canvas')?.dataset.pixels,b=document.querySelector('#simulator-canvas')?.dataset.pixels; return a && a===b && a.split(',').some((v,i)=>i%4!==3&&+v>0); }");
+    var condition = requireSimulator ? "() => { const a=document.querySelector('#design-canvas')?.dataset.pixels,b=document.querySelector('#simulator-canvas')?.dataset.pixels; return a && a===b && a.split(',').some((v,i)=>i%4!==3&&+v>0); }" : "() => { const a=document.querySelector('#design-canvas')?.dataset.pixels; return a && a.split(',').some((v,i)=>i%4!==3&&+v>0); }";
+    await page.WaitForFunctionAsync(condition);
     Check(true, label);
 }
 async Task InsertText(string text, string effect)
@@ -69,7 +70,7 @@ try
     await Expect(page.Locator("dialog")).ToHaveCountAsync(0);
     await Value("X", "9");
     await Value("Duración del frame (ms)", "10000");
-    await VisiblePixels("Encabezado visible y mismos píxeles en Canvas y simulador");
+    await VisiblePixels("Encabezado visible en el Canvas");
 
     await Button("Ocultar Capa 1").ClickAsync();
     await page.WaitForFunctionAsync("() => document.querySelector('#design-canvas').dataset.pixels.split(',').every((v,i)=>i%4===3||+v===0)");
@@ -85,7 +86,7 @@ try
     var paused = await page.Locator(".time").TextContentAsync();
     await Task.Delay(150);
     Check(paused == await page.Locator(".time").TextContentAsync(), "Pausar conserva el instante");
-    await Button("Detener").ClickAsync();
+    await page.Locator(".playback").GetByRole(AriaRole.Button, new() { Name = "Detener", Exact = true }).ClickAsync();
     await Expect(page.Locator(".time")).ToHaveTextAsync("0.00 / 10.00 s");
     await Value("Duración del frame (ms)", "");
     Check(!await page.GetByLabel("Duración del frame (ms)").EvaluateAsync<bool>("e=>e.checkValidity()"), "Duración vacía rechazada");
@@ -156,7 +157,7 @@ try
 
     await Button("Enviar al simulador").ClickAsync();
     await Expect(page.Locator("#deployment-status")).ToHaveTextAsync("Correcto", new() { Timeout = 30000 });
-    await VisiblePixels("Paquete recibido coincide con el Canvas");
+    await VisiblePixels("Paquete recibido coincide con el Canvas", true);
     Check((await page.Locator("#checksum").GetAttributeAsync("title"))?.Length == 64, "SHA-256 recibido y verificado");
     await Expect(Button("Cancelar envío")).ToBeHiddenAsync();
     foreach (var size in new[] { (1920, 1080), (1600, 900), (1366, 768) })

@@ -2,6 +2,10 @@ param([string]$ChromePath)
 $ErrorActionPreference = 'Stop'
 $atlasRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $atlasDotnet = Join-Path $atlasRoot '.dotnet/dotnet.exe'
+if (!(Test-Path -LiteralPath $atlasDotnet)) {
+    $atlasDotnet = (Get-Command dotnet -ErrorAction SilentlyContinue).Source
+}
+if (!$atlasDotnet) { throw 'No se encontró un SDK de .NET.' }
 $env:DOTNET_ROOT = Join-Path $atlasRoot '.dotnet'
 $env:DOTNET_CLI_HOME = Join-Path $atlasRoot '.dotnet-home'
 $env:NUGET_PACKAGES = Join-Path $env:USERPROFILE '.nuget/packages'

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import {webcrypto} from 'node:crypto';
 import {renderScene} from '../../src/AtlasLetrero.App/wwwroot/js/editor/scene-renderer.js';
 import {rasterText} from '../../src/AtlasLetrero.App/wwwroot/js/assets/bitmap-font.js';
-import {SimulatorTransport,deploy,hash} from '../../src/AtlasLetrero.App/wwwroot/js/editor/deployment-controller.js';
+import {SimulatorTransport,PhysicalTransport,deploy,hash} from '../../src/AtlasLetrero.App/wwwroot/js/editor/deployment-controller.js';
 import {SaveCoordinator} from '../../src/AtlasLetrero.App/wwwroot/js/editor/save-coordinator.js';
 import {validateText} from '../../src/AtlasLetrero.App/wwwroot/js/assets/text-validation.js';
 
@@ -75,3 +75,11 @@ assert.equal(state.dirty,true,'Un cambio durante el guardado continúa pendiente
 let fail=true;const retry=new SaveCoordinator(state,async()=>{if(fail)throw Error('Disco ocupado');});
 await assert.rejects(retry.save(),/Disco ocupado/);assert.equal(state.dirty,true);fail=false;await retry.save();assert.equal(state.dirty,false);
 console.log('PASS: guardado explícito espera autosave, conserva cambios concurrentes y permite reintentar errores.');
+
+const originalFetch=globalThis.fetch;
+globalThis.fetch=async()=>({ok:false,json:async()=>({message:'Desconexión durante transferencia'})});
+await assert.rejects(new PhysicalTransport().receive(new TextEncoder().encode('{}'),'0'.repeat(64)),/Desconexión/);
+globalThis.fetch=async()=>({ok:true,json:async()=>({checksum:'0'.repeat(64),activated:false})});
+await assert.rejects(new PhysicalTransport().receive(new TextEncoder().encode('{}'),'0'.repeat(64)),/activación/);
+globalThis.fetch=originalFetch;
+console.log('BLOCKED BY HARDWARE: transporte físico sólo pasa con ESP32 AtlasLED y ACK/VERIFY/ACTIVATE reales.');

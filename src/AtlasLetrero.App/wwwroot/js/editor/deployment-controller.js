@@ -19,6 +19,12 @@ export class SimulatorTransport {
  }
  frameAt(time){const p=this.package;if(!p)return null;const frame=new FrameBuffer(p.width,p.height);const index=Math.max(0,Math.min(p.frames.length-1,Math.floor(time*p.fps/1000+1e-9)));frame.data.set(p.frames[index]);return frame;}
 }
+
+export class PhysicalTransport {
+ constructor(){this.lastChecksum=null;}
+ async receive(bytes,expected){const packet=JSON.parse(new TextDecoder().decode(bytes));const response=await fetch('/api/devices/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({checksum:expected,packet})});const result=await response.json();if(!response.ok||result.checksum!==expected||result.activated!==true)throw new Error(result.message||'El firmware no confirmó la activación.');this.lastChecksum=result.checksum;return result.checksum;}
+ activate(checksum){if(this.lastChecksum!==checksum)throw new Error('El ESP32 no confirmó el checksum activo.');}
+}
 export async function deploy(project,scene,transport,notify,signal,canActivate=()=>true){
  try{
   notify('Validando',0);signal?.throwIfAborted();

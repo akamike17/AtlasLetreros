@@ -2,6 +2,8 @@ using System.IO.Ports;
 using System.Buffers.Binary;
 using System.Text.Json.Nodes;
 using AtlasLetrero.App.Protocol;
+using System.Security.Cryptography;
+using System.Text;
 namespace AtlasLetrero.App.Services;
 public sealed class DeviceConnectionService : IDisposable
 {
@@ -48,6 +50,32 @@ public sealed class DeviceConnectionService : IDisposable
             var response=new byte[16+(int)size];header.CopyTo(response,0);var rest=new byte[size+4];ReadExact(rest);rest.CopyTo(response,12);
             var packet=PacketCodec.Decode(response);if(packet.Sequence!=seq)throw new InvalidDataException("Secuencia incorrecta.");return packet;
         }
+    }
+    public string Upload(JsonObject packet, string expectedChecksum, CancellationToken cancellationToken = default)
+    {
+        lock (gate)
+        {
+            if (virtualConnected || port?.IsOpen != true) throw new InvalidOperationException("No hay un ESP32 AtlasLED conectado.");
+            var bytes = Encoding.UTF8.GetBytes(packet.ToJsonString());
+            var checksum = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+            if (!String.Equals(checksum, expectedChecksum, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("El checksum del paquete físico no coincide.");
+            SendAck(AtlasLedCommand.BeginUpload, Encoding.UTF8.GetBytes($"{{\"length\":{bytes.Length},\"sha256\":\"{checksum}\"}}"), cancellationToken);
+            const int chunk = 60000;
+            for (var offset = 0; offset < bytes.Length; offset += chunk)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                SendAck(AtlasLedCommand.FrameData, bytes.AsSpan(offset, Math.Min(chunk, bytes.Length - offset)).ToArray(), cancellationToken);
+            }
+            SendAck(AtlasLedCommand.Verify, Encoding.UTF8.GetBytes(checksum), cancellationToken);
+            SendAck(AtlasLedCommand.Activate, Encoding.UTF8.GetBytes(checksum), cancellationToken);
+            return checksum;
+        }
+    }
+    private void SendAck(AtlasLedCommand command, byte[] payload, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var response = Exchange(command, payload);
+        if (response.Command is AtlasLedCommand.Nack or AtlasLedCommand.Error || response.Command != AtlasLedCommand.Ack) throw new InvalidDataException($"El dispositivo rechazó {command}.");
     }
     private void ReadExact(byte[] buffer){var offset=0;while(offset<buffer.Length){var n=port!.Read(buffer,offset,buffer.Length-offset);if(n<=0)throw new TimeoutException();offset+=n;}}
     public void Disconnect(){lock(gate){port?.Dispose();port=null;virtualConnected=false;Capabilities=null;}}
