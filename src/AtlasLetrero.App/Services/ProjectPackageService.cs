@@ -11,22 +11,22 @@ public sealed class ProjectPackageService(AppPaths paths, AtomicFileWriter write
     {
         try
         {
-        var name = document["name"]?.GetValue<string>();
-        if (!Guid.TryParse(document["id"]?.GetValue<string>(), out _) || string.IsNullOrWhiteSpace(name) || name.Length > 100) throw new InvalidDataException();
-        if (document["formatVersion"]?.GetValue<int>() != 1) throw new InvalidDataException();
-        var matrix = document["matrix"] ?? throw new InvalidDataException();
-        var w = matrix["width"]!.GetValue<int>(); var h = matrix["height"]!.GetValue<int>();
-        if (w < 1 || h < 1 || w > 256 || h > 256 || matrix["fps"]!.GetValue<int>() is < 1 or > 60) throw new InvalidDataException();
-        if (document["scenes"] is not JsonArray { Count: > 0 } scenes || scenes.Count > MaxScenes) throw new InvalidDataException();
-        foreach (var scene in scenes)
-        {
-            if (scene?["frames"] is not JsonArray { Count: > 0 } frames || frames.Count > MaxFramesPerScene) throw new InvalidDataException();
-            foreach (var frame in frames)
+            var name = document["name"]?.GetValue<string>();
+            if (!Guid.TryParse(document["id"]?.GetValue<string>(), out _) || string.IsNullOrWhiteSpace(name) || name.Length > 100) throw new InvalidDataException();
+            if (document["formatVersion"]?.GetValue<int>() != 1) throw new InvalidDataException();
+            var matrix = document["matrix"] ?? throw new InvalidDataException();
+            var w = matrix["width"]!.GetValue<int>(); var h = matrix["height"]!.GetValue<int>();
+            if (w < 1 || h < 1 || w > 256 || h > 256 || matrix["fps"]!.GetValue<int>() is < 1 or > 60) throw new InvalidDataException();
+            if (document["scenes"] is not JsonArray { Count: > 0 } scenes || scenes.Count > MaxScenes) throw new InvalidDataException();
+            foreach (var scene in scenes)
             {
-                if (frame?["durationMs"]?.GetValue<int>() is not (>= 20 and <= 600000)) throw new InvalidDataException();
-                if (frame?["layers"] is not JsonArray { Count: > 0 } layers || layers.Count > MaxLayersPerFrame || layers.Any(layer => layer?["objects"] is not JsonArray objects || objects.Count > MaxObjectsPerLayer)) throw new InvalidDataException();
+                if (scene?["frames"] is not JsonArray { Count: > 0 } frames || frames.Count > MaxFramesPerScene) throw new InvalidDataException();
+                foreach (var frame in frames)
+                {
+                    if (frame?["durationMs"]?.GetValue<int>() is not (>= 20 and <= 600000)) throw new InvalidDataException();
+                    if (frame?["layers"] is not JsonArray { Count: > 0 } layers || layers.Count > MaxLayersPerFrame || layers.Any(layer => layer?["objects"] is not JsonArray objects || objects.Count > MaxObjectsPerLayer)) throw new InvalidDataException();
+                }
             }
-        }
         }
         catch (Exception ex) when (ex is InvalidOperationException or FormatException or NullReferenceException)
         {
@@ -50,8 +50,17 @@ public sealed class ProjectPackageService(AppPaths paths, AtomicFileWriter write
     {
         lock (gate) return Directory.EnumerateFiles(paths.Projects, "*.atlasled").Select(file =>
         {
-            try { var p = Read(file); return new { id = p["id"]!.GetValue<string>(), name = p["name"]!.GetValue<string>(), matrix = p["matrix"]!.DeepClone(), modifiedUtc = p["modifiedUtc"]!.GetValue<string>() }; }
-            catch (Exception ex) when (ex is InvalidDataException or InvalidOperationException or FormatException or System.Text.Json.JsonException) { return null; }
+            try
+            {
+                var p = Read(file);
+                var modified = p["modifiedUtc"]?.GetValue<string>();
+                if (string.IsNullOrWhiteSpace(modified) || !DateTimeOffset.TryParse(modified, out _)) throw new InvalidDataException("Fecha de modificación inválida.");
+                return new { id = p["id"]!.GetValue<string>(), name = p["name"]!.GetValue<string>(), matrix = p["matrix"]!.DeepClone(), modifiedUtc = modified };
+            }
+            catch (Exception ex) when (ex is InvalidDataException or InvalidOperationException or FormatException or NullReferenceException or System.Text.Json.JsonException or IOException)
+            {
+                return null;
+            }
         }).Where(p => p is not null).OrderByDescending(p => p!.modifiedUtc).Cast<object>().ToArray();
     }
     public JsonObject Save(Guid id, JsonObject document, bool autosave = false)
@@ -74,7 +83,15 @@ public sealed class ProjectPackageService(AppPaths paths, AtomicFileWriter write
     }
     public JsonObject? Recovery(Guid id)
     {
-        lock (gate) { var autosave=paths.Autosave(id); if(!File.Exists(autosave)) return null; var project=paths.Project(id); var autosaveTime=File.GetLastWriteTimeUtc(autosave); var projectTime=File.Exists(project)?File.GetLastWriteTimeUtc(project):DateTime.MinValue; return autosaveTime>projectTime?Read(autosave):null; }
+        lock (gate)
+        {
+            var autosave = paths.Autosave(id);
+            if (!File.Exists(autosave)) return null;
+            var project = paths.Project(id);
+            var autosaveTime = File.GetLastWriteTimeUtc(autosave);
+            var projectTime = File.Exists(project) ? File.GetLastWriteTimeUtc(project) : DateTime.MinValue;
+            return autosaveTime > projectTime ? Read(autosave) : null;
+        }
     }
     public void Delete(Guid id)
     {
