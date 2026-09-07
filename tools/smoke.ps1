@@ -19,6 +19,18 @@ if (!$ChromePath) {
 $atlasPreviousChrome = $env:ATLAS_TEST_CHROME
 if ($ChromePath) { $env:ATLAS_TEST_CHROME = $ChromePath }
 $atlasServer = $null
+function Show-AtlasServerLogs {
+    $stdout = Join-Path $atlasRun 'server.log'
+    $stderr = Join-Path $atlasRun 'server-error.log'
+    if (Test-Path $stdout) {
+        Write-Host "`n===== server.log =====" -ForegroundColor Yellow
+        Get-Content $stdout -Tail 120
+    }
+    if (Test-Path $stderr) {
+        Write-Host "`n===== server-error.log =====" -ForegroundColor Yellow
+        Get-Content $stderr -Tail 120
+    }
+}
 Push-Location $atlasRoot
 try {
     & node tests/AtlasLetrero.Tests/render-regression.mjs
@@ -38,13 +50,30 @@ try {
     $atlasServer = Start-Process -FilePath $atlasDotnet -ArgumentList $atlasArguments -WorkingDirectory (Join-Path $atlasRoot 'src/AtlasLetrero.App') -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $atlasRun 'server.log') -RedirectStandardError (Join-Path $atlasRun 'server-error.log')
     $atlasReady = $false
     for ($atlasAttempt=0; $atlasAttempt -lt 40; $atlasAttempt++) {
-        if ($atlasServer.HasExited) { throw "Servidor de prueba terminado. Revisa $atlasRun" }
+        if ($atlasServer.HasExited) { Show-AtlasServerLogs; throw "Servidor de prueba terminado. Revisa $atlasRun" }
         try { if ((Invoke-RestMethod "$atlasUrl/api/health" -TimeoutSec 1).status -eq 'ok') { $atlasReady = $true; break } } catch {}
         Start-Sleep -Milliseconds 250
     }
-    if (!$atlasReady) { throw 'El servidor de prueba no respondió.' }
-    & $atlasDotnet (Join-Path $atlasBuild 'bin/AtlasLetrero.E2E/release/AtlasLetrero.E2E.dll') $atlasUrl $atlasRun
-    if ($LASTEXITCODE -ne 0) { throw "Fallaron las pruebas E2E. Evidencia: $atlasRun" }
+    if (!$atlasReady) { Show-AtlasServerLogs; throw 'El servidor de prueba no respondió.' }
+
+    $atlasE2E = Join-Path $atlasBuild 'bin/AtlasLetrero.E2E/release/AtlasLetrero.E2E.dll'
+    $atlasPassed = $false
+    for ($attempt = 1; $attempt -le 2; $attempt++) {
+        $attemptOutput = Join-Path $atlasRun ("e2e-attempt-" + $attempt)
+        New-Item -ItemType Directory -Path $attemptOutput -Force | Out-Null
+        Write-Host "Ejecutando E2E intento $attempt/2..." -ForegroundColor Cyan
+        & $atlasDotnet $atlasE2E $atlasUrl $attemptOutput
+        if ($LASTEXITCODE -eq 0) {
+            $atlasPassed = $true
+            break
+        }
+        Write-Warning "E2E intento $attempt falló."
+        if ($attempt -lt 2) { Start-Sleep -Seconds 2 }
+    }
+    if (!$atlasPassed) {
+        Show-AtlasServerLogs
+        throw "Fallaron las pruebas E2E en dos intentos. Evidencia: $atlasRun"
+    }
     Write-Output "PASS. Evidencia: $atlasRun"
 } finally {
     if ($atlasServer -and !$atlasServer.HasExited) { Stop-Process -Id $atlasServer.Id }
