@@ -102,11 +102,11 @@ public sealed class DeviceConnectionService : IDisposable
             } catch { verifiedCandidate = null; throw; }
         }
     }
-    public string Activate(string candidate, CancellationToken cancellationToken = default)
+    public string Activate(string candidate, string requestedChecksum, CancellationToken cancellationToken = default)
     {
         lock (gate)
         {
-            if (verifiedCandidate is null || !String.Equals(verifiedCandidate.Id, candidate, StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("No hay candidato verificado.");
+            if (verifiedCandidate is null || !String.Equals(verifiedCandidate.Id, candidate, StringComparison.OrdinalIgnoreCase) || !String.Equals(verifiedCandidate.Checksum, requestedChecksum, StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("No hay candidato verificado.");
             try { SendAck(AtlasLedCommand.Activate, Encoding.UTF8.GetBytes(verifiedCandidate.Checksum), cancellationToken); var checksum=verifiedCandidate.Checksum; verifiedCandidate = null; return checksum; }
             catch { verifiedCandidate = null; throw; }
         }
@@ -115,8 +115,8 @@ public sealed class DeviceConnectionService : IDisposable
     {
         try {
             if (Capabilities is null || packet["version"]?.GetValue<int>() != Capabilities["protocol"]?.GetValue<int>() || packet["width"]?.GetValue<int>() is not int w || packet["height"]?.GetValue<int>() is not int h || w < 1 || h < 1 || w > Capabilities["width"]!.GetValue<int>() || h > Capabilities["height"]!.GetValue<int>()) throw new InvalidDataException();
-            var fps=packet["fps"]?.GetValue<int>() ?? 0; var duration=packet["durationMs"]?.GetValue<int>() ?? 0;
-            if (fps is < 1 or > 60 || duration <= 0 || packet["frames"] is not JsonArray frames || frames.Count != (int)Math.Ceiling((double)duration*fps/1000) || frames.Any(f => f is not JsonArray a || a.Count != w*h*4 || a.Any(v => v?.GetValue<int>() is < 0 or > 255))) throw new InvalidDataException();
+            var fps=packet["fps"]?.GetValue<int>() ?? 0; var duration=packet["durationMs"]?.GetValue<int>() ?? 0; var expectedFrames=duration>0&&fps>0?((long)duration*fps+999)/1000:0;
+            if ((long)w*h*4 > PhysicalPayloadLimit || fps is < 1 or > 60 || duration <= 0 || expectedFrames > 256 || packet["frames"] is not JsonArray frames || frames.Count != expectedFrames || frames.Any(f => f is not JsonArray a || a.Count != (long)w*h*4 || a.Any(v => v?.GetValue<int>() is < 0 or > 255))) throw new InvalidDataException();
         } catch (Exception ex) when (ex is InvalidOperationException or FormatException or NullReferenceException) { throw new InvalidDataException("El paquete físico contiene campos inválidos.", ex); }
         catch (InvalidDataException) { throw new InvalidDataException("El paquete excede el protocolo o las capacidades del AtlasLED."); }
     }

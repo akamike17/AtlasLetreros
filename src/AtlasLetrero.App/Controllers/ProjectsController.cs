@@ -19,7 +19,7 @@ public sealed class ProjectsController(ProjectPackageService projects) : Control
     [HttpPost("{id:guid}/duplicate")] public object Duplicate(Guid id)
     {
         var document = projects.Get(id); var newId = Guid.NewGuid();
-        document["id"] = newId.ToString(); document["name"] = document["name"]!.GetValue<string>() + " — copia";
+        document["id"] = newId.ToString(); var originalName=document["name"]!.GetValue<string>(); document["name"] = (originalName.Length > 92 ? originalName[..92] : originalName) + " — copia";
         document["createdUtc"] = DateTime.UtcNow.ToString("O");
         return projects.Save(newId, document);
     }

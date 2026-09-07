@@ -37,7 +37,7 @@ public sealed class ProjectPackageService(AppPaths paths, AtomicFileWriter write
     {
         using var archive = ZipFile.OpenRead(file);
         var entry = archive.GetEntry("manifest.json") ?? throw new InvalidDataException();
-        if (entry.Length > 64 * 1024 * 1024) throw new InvalidDataException();
+        if (entry.Length > 8 * 1024 * 1024) throw new InvalidDataException("El manifiesto supera el límite de 8 MB.");
         using var stream = entry.Open();
         JsonObject document;
         try { document = JsonNode.Parse(stream) as JsonObject ?? throw new InvalidDataException(); }
@@ -74,7 +74,7 @@ public sealed class ProjectPackageService(AppPaths paths, AtomicFileWriter write
     }
     public JsonObject? Recovery(Guid id)
     {
-        lock (gate) return File.Exists(paths.Autosave(id)) && File.GetLastWriteTimeUtc(paths.Autosave(id)) > File.GetLastWriteTimeUtc(paths.Project(id)) ? Read(paths.Autosave(id)) : null;
+        lock (gate) { var autosave=paths.Autosave(id); if(!File.Exists(autosave)) return null; var project=paths.Project(id); var autosaveTime=File.GetLastWriteTimeUtc(autosave); var projectTime=File.Exists(project)?File.GetLastWriteTimeUtc(project):DateTime.MinValue; return autosaveTime>projectTime?Read(autosave):null; }
     }
     public void Delete(Guid id)
     {

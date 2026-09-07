@@ -85,7 +85,7 @@ globalThis.fetch=originalFetch;
 const physicalProject=structuredClone(project),physicalScene=structuredClone(scene);
 let activateCalls=0;
 globalThis.fetch=async(url,options)=>{
- if(url==='/api/devices/upload')return {ok:true,json:async()=>({checksum:JSON.parse(options.body).checksum,verified:true,activated:false})};
+ if(url==='/api/devices/upload')return {ok:true,json:async()=>({checksum:JSON.parse(options.body).checksum,candidateId:'0123456789abcdef0123456789abcdef',verified:true,activated:false})};
  if(url==='/api/devices/activate'){activateCalls++;return {ok:true,json:async()=>({checksum:JSON.parse(options.body).checksum,activated:true})};}
  throw new Error('URL inesperada: '+url);
 };

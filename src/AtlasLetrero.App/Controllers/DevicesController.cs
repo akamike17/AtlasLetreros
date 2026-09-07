@@ -15,7 +15,7 @@ public sealed class DevicesController(DeviceConnectionService device) : Controll
         var actual=device.Upload(packet,checksum,HttpContext.RequestAborted); return new { checksum=actual, candidateId=device.CandidateId, verified=true, activated=false };
     }
     [HttpPost("activate"), RequestSizeLimit(1024)] public object Activate(JsonObject request)
-    { var candidateId=request["candidateId"]?.GetValue<string>() ?? throw new InvalidDataException("Falta candidato."); return new { checksum=device.Activate(candidateId,HttpContext.RequestAborted), activated=true }; }
+    { var candidateId=request["candidateId"]?.GetValue<string>() ?? throw new InvalidDataException("Falta candidato."); var checksum=request["checksum"]?.GetValue<string>() ?? throw new InvalidDataException("Falta checksum."); return new { checksum=device.Activate(candidateId,checksum,HttpContext.RequestAborted), activated=true }; }
     public sealed record ConnectRequest(string Port);
     [HttpPost("connect")]public IActionResult Connect(ConnectRequest request)
     {
