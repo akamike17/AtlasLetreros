@@ -1,7 +1,7 @@
 import {duration,renderScene} from './scene-renderer.js';
 import {FrameBuffer} from './framebuffer.js';
 export async function hash(bytes){const digest=await crypto.subtle.digest('SHA-256',bytes);return Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');}
-const limit=64*1024*1024;
+export const limit=8*1024*1024;
 export class SimulatorTransport {
  constructor(){this.package=null;this.receivedHash=null;this.candidate=null;}
  async receive(bytes,expected){
@@ -22,7 +22,8 @@ export class SimulatorTransport {
 
 export class PhysicalTransport {
  constructor(){this.lastChecksum=null;}
- async receive(bytes,expected){const packet=JSON.parse(new TextDecoder().decode(bytes));const response=await fetch('/api/devices/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({checksum:expected,packet})});const result=await response.json();if(!response.ok||result.checksum!==expected||result.activated!==true)throw new Error(result.message||'El firmware no confirmó la activación.');this.lastChecksum=result.checksum;return result.checksum;}
+ async receive(bytes,expected,signal){const packet=JSON.parse(new TextDecoder().decode(bytes));const response=await fetch('/api/devices/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({checksum:expected,packet}),signal});const result=await response.json();if(!response.ok||result.checksum!==expected||result.verified!==true||result.activated===true)throw new Error(result.message||'El firmware no confirmó la verificación.');this.lastChecksum=result.checksum;return result.checksum;}
+ async activate(checksum,signal){if(this.lastChecksum!==checksum)throw new Error('El ESP32 no confirmó el checksum verificado.');const response=await fetch('/api/devices/activate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({checksum}),signal});const result=await response.json();if(!response.ok||result.checksum!==checksum||result.activated!==true)throw new Error(result.message||'El firmware no confirmó la activación.');this.lastChecksum=null;}
  activate(checksum){if(this.lastChecksum!==checksum)throw new Error('El ESP32 no confirmó el checksum activo.');}
 }
 export async function deploy(project,scene,transport,notify,signal,canActivate=()=>true){
@@ -43,11 +44,11 @@ export async function deploy(project,scene,transport,notify,signal,canActivate=(
   const packet={version:1,width,height,fps,durationMs:total,frames};
   const bytes=new TextEncoder().encode(JSON.stringify(packet)),checksum=await hash(bytes);
   signal?.throwIfAborted();notify('Enviando',80);await new Promise(r=>setTimeout(r,0));
-  signal?.throwIfAborted();notify('Verificando',92);const received=await transport.receive(bytes,checksum);
+  signal?.throwIfAborted();notify('Verificando',92);const received=await transport.receive(bytes,checksum,signal);
   if(received!==checksum)throw new Error('Falló la verificación del simulador.');
   notify('Activando',98);signal?.throwIfAborted();
   if(!canActivate())throw new Error('El proyecto cambió durante el envío. Envía de nuevo.');
-  transport.activate(checksum);
+  await transport.activate(checksum,signal);
   return {checksum,frames:frames.length,bytes:bytes.length};
  }catch(error){transport.candidate=null;throw error;}
 }

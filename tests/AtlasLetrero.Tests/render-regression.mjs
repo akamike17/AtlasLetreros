@@ -79,7 +79,7 @@ console.log('PASS: guardado explícito espera autosave, conserva cambios concurr
 const originalFetch=globalThis.fetch;
 globalThis.fetch=async()=>({ok:false,json:async()=>({message:'Desconexión durante transferencia'})});
 await assert.rejects(new PhysicalTransport().receive(new TextEncoder().encode('{}'),'0'.repeat(64)),/Desconexión/);
-globalThis.fetch=async()=>({ok:true,json:async()=>({checksum:'0'.repeat(64),activated:false})});
-await assert.rejects(new PhysicalTransport().receive(new TextEncoder().encode('{}'),'0'.repeat(64)),/activación/);
+globalThis.fetch=async()=>({ok:true,json:async()=>({checksum:'0'.repeat(64),verified:false,activated:false})});
+await assert.rejects(new PhysicalTransport().receive(new TextEncoder().encode('{}'),'0'.repeat(64)),/verificación/);
 globalThis.fetch=originalFetch;
 console.log('BLOCKED BY HARDWARE: transporte físico sólo pasa con ESP32 AtlasLED y ACK/VERIFY/ACTIVATE reales.');
