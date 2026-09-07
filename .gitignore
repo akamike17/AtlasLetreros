@@ -1,5 +1,6 @@
 **/bin/
 **/obj/
+**/.backend-test-output/
 .vs/
 TestResults/
 artifacts/
