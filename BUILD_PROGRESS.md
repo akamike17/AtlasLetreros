@@ -24,15 +24,29 @@
 - Durante el primer arranque, el sandbox impidió crear la carpeta de proyectos en Documentos. Se reinició con permisos aprobados para las rutas de datos; también se eliminó la dependencia del registro de eventos de Windows, conservando logging por consola/archivo del lanzador.
 - El build del lanzador tiene 0 errores y 2 advertencias NU1900 por consulta de vulnerabilidades NuGet no disponible. La compilación previa con auditoría de red omitida tuvo 0 advertencias; no confundir ambas ejecuciones.
 
-## Estado
+## Estado actualizado — Master 2 / correcciones puntuales
 
-A | EN CURSO | Preparación de herramientas y solución.
-B | PENDIENTE | Editor, dibujo, historial, capas y escenas.
-C | PENDIENTE | Bancos locales, licencias, texto e imágenes.
-D | PENDIENTE | Timeline, efectos, guardado y recuperación.
-E | PENDIENTE | Transporte de simulador y verificación.
-F | PENDIENTE | Protocolo serial, firmware y pruebas sin hardware.
+| Fecha | SHA/rama | Bloque | Estado | Comando o acción | Evidencia | Pendiente |
+|---|---|---|---|---|---|---|
+| 2026-09-06 | `c91acf3` / `master2-product` | A | PASS | `\.dotnet\dotnet.exe --version` | `8.0.424`; servidor loopback abre | Ninguno en apertura |
+| 2026-09-06 | `c91acf3` / `master2-product` | Render | PASS | `node tests/AtlasLetrero.Tests/render-regression.mjs` | 8 tipos de objeto, texto bitmap español, parpadeo y transporte verificados | Ampliar golden fixtures |
+| 2026-09-06 | `c91acf3` / `master2-product` | UX | PASS | Flujo manual en navegador | Inicio → Proyectos → Editor → Configuración → Editor; Configuración responde y detecta COM3/COM4 como “sin identificar” | Playwright .NET formal |
+| 2026-09-06 | `c91acf3` / `master2-product` | Validación | PASS | Prueba manual de escala | Escala 6 con fuente 5×7 en matriz 96×16 bloqueada con mensaje visible; escala 1 insertada | Validar también límites de ancho por efecto |
+| 2026-09-06 | `c91acf3` / `master2-product` | Secuencia | PASS | Flujo visual solicitado | Proyecto `SOLUCIONES MG`, frame 1 `10000 ms` + `blink`, frame 2 `6000 ms` + `Marquee izquierda`, frame 3 `3000 ms` + icono local `pc-display` 16×16 | E2E automatizado |
+| 2026-09-06 | `c91acf3` / `master2-product` | Paridad | PASS | Evaluación en navegador | Canvas y Simulador comparten los mismos píxeles; sin overflow horizontal; sin `[object Promise]`, `undefined` o `null` visibles | Probar también 1366×768 |
+| 2026-09-06 | `c91acf3` / `master2-product` | Envío local | PASS | `Enviar al simulador` en navegador | `Paquete recibido 96×16 · 12 FPS`, progreso 100, SHA-256 visible y estado `Correcto` después de recepción/verificación | Hardware físico no disponible |
+| 2026-09-06 | `c91acf3` / `master2-product` | Hardware | BLOQUEADO POR HARDWARE | Detección USB/Serial | No se inventa ESP32; COM3/COM4 quedan “sin identificar” hasta handshake | Probar con ESP32 AtlasLED real |
 
-## Validación
+La captura original mostraba el defecto corregido: el objeto de texto tenía `787 × 78` en una matriz de `32 × 16`, y el renderer no pintaba objetos bitmap. Ahora la validación bloquea alturas imposibles y el renderer compartido sí pinta texto, iconos e imágenes en Canvas y Simulador.
 
-Todavía no hay build, pruebas E2E ni prueba visual ejecutados. No se ha conectado ni identificado hardware.
+## Evidencia de la pasada actual
+
+- Captura de navegador: encabezado `SOLUCIONES MG` visible en Canvas y Simulador, frame 1, `00.00 / 19.00 s`.
+- Frame 2: `SE REPARAN COMPUTADORAS`, objeto de `137 × 7 LED`, efecto `Marquee izquierda`, visible y desplazable.
+- Frame 3: icono local `Computadora` (`pc-display`, Bootstrap Icons), `16 × 16 LED`, visible en ambos previews.
+- `Play` avanzó de `0.00` a `0.50`; `Pause` conservó `5.77 / 19.00 s` durante 400 ms; `Stop` regresó a `0.00 / 19.00 s`.
+- Después de recargar, los tres frames, textos, efectos y duraciones permanecieron.
+- En 1366×768: Canvas visible, simulador visible con 85 px, botón Enviar visible y overflow horizontal `false`.
+- Consola del navegador durante la pasada: 0 errores.
+- El envío al simulador terminó con `Paquete recibido 96×16 · 12 FPS`, `SHA-256 024b39c07567…`, progreso 100 y `Correcto`.
+- La regresión JS también valida escala/altura inválida, texto vacío y dimensiones calculadas del rasterizador; ejecución final: `PASS`.

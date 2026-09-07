@@ -3,5 +3,5 @@ namespace AtlasLetrero.App.Controllers;
 [ApiController, Route("api/health")]
 public sealed class HealthController : ControllerBase
 {
-    [HttpGet] public object Get() => new { status = "ok" };
+    [HttpGet] public object Get() => new { status = "ok", product = "Atlas Letrero", version = "0.1.0" };
 }

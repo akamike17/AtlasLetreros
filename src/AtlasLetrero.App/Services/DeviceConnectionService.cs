@@ -6,10 +6,15 @@ namespace AtlasLetrero.App.Services;
 public sealed class DeviceConnectionService : IDisposable
 {
     private SerialPort? port;
+    private bool virtualConnected;
     private ushort sequence;
     public JsonObject? Capabilities {get;private set;}
-    public object Status => new { connected=port?.IsOpen==true && Capabilities is not null, port=port?.PortName, capabilities=Capabilities };
+    public object Status => new { connected=virtualConnected || port?.IsOpen==true && Capabilities is not null, port=virtualConnected ? "AtlasLED Virtual" : port?.PortName, capabilities=Capabilities };
     public string[] Ports() => SerialPort.GetPortNames().Order().ToArray();
+    public object ConnectVirtual()
+    {
+        lock(gate) { Disconnect(); virtualConnected=true; Capabilities=(JsonObject)JsonNode.Parse("{\"firmware\":\"AtlasLED Virtual 0.1\",\"protocol\":1,\"width\":256,\"height\":256}")!; return Status; }
+    }
     private readonly object gate=new();
     public object Connect(string name)
     {
@@ -45,6 +50,6 @@ public sealed class DeviceConnectionService : IDisposable
         }
     }
     private void ReadExact(byte[] buffer){var offset=0;while(offset<buffer.Length){var n=port!.Read(buffer,offset,buffer.Length-offset);if(n<=0)throw new TimeoutException();offset+=n;}}
-    public void Disconnect(){lock(gate){port?.Dispose();port=null;Capabilities=null;}}
+    public void Disconnect(){lock(gate){port?.Dispose();port=null;virtualConnected=false;Capabilities=null;}}
     public void Dispose()=>Disconnect();
 }

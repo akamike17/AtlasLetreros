@@ -5,15 +5,33 @@ namespace AtlasLetrero.App.Services;
 
 public sealed class ProjectPackageService(AppPaths paths, AtomicFileWriter writer)
 {
+    public const int MaxScenes = 64, MaxFramesPerScene = 256, MaxLayersPerFrame = 64, MaxObjectsPerLayer = 512;
     private readonly object gate = new();
     public static void Validate(JsonObject document)
     {
-        if (!Guid.TryParse(document["id"]?.GetValue<string>(), out _) || string.IsNullOrWhiteSpace(document["name"]?.GetValue<string>())) throw new InvalidDataException();
+        try
+        {
+        var name = document["name"]?.GetValue<string>();
+        if (!Guid.TryParse(document["id"]?.GetValue<string>(), out _) || string.IsNullOrWhiteSpace(name) || name.Length > 100) throw new InvalidDataException();
         if (document["formatVersion"]?.GetValue<int>() != 1) throw new InvalidDataException();
         var matrix = document["matrix"] ?? throw new InvalidDataException();
         var w = matrix["width"]!.GetValue<int>(); var h = matrix["height"]!.GetValue<int>();
         if (w < 1 || h < 1 || w > 256 || h > 256 || matrix["fps"]!.GetValue<int>() is < 1 or > 60) throw new InvalidDataException();
-        if (document["scenes"] is not JsonArray { Count: > 0 }) throw new InvalidDataException();
+        if (document["scenes"] is not JsonArray { Count: > 0 } scenes || scenes.Count > MaxScenes) throw new InvalidDataException();
+        foreach (var scene in scenes)
+        {
+            if (scene?["frames"] is not JsonArray { Count: > 0 } frames || frames.Count > MaxFramesPerScene) throw new InvalidDataException();
+            foreach (var frame in frames)
+            {
+                if (frame?["durationMs"]?.GetValue<int>() is not (>= 20 and <= 600000)) throw new InvalidDataException();
+                if (frame?["layers"] is not JsonArray { Count: > 0 } layers || layers.Count > MaxLayersPerFrame || layers.Any(layer => layer?["objects"] is not JsonArray objects || objects.Count > MaxObjectsPerLayer)) throw new InvalidDataException();
+            }
+        }
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or FormatException or NullReferenceException)
+        {
+            throw new InvalidDataException("El proyecto contiene campos incompletos o de tipo incorrecto.", ex);
+        }
     }
     public JsonObject Read(string file)
     {
@@ -21,7 +39,9 @@ public sealed class ProjectPackageService(AppPaths paths, AtomicFileWriter write
         var entry = archive.GetEntry("manifest.json") ?? throw new InvalidDataException();
         if (entry.Length > 64 * 1024 * 1024) throw new InvalidDataException();
         using var stream = entry.Open();
-        var document = JsonNode.Parse(stream)?.AsObject() ?? throw new InvalidDataException();
+        JsonObject document;
+        try { document = JsonNode.Parse(stream) as JsonObject ?? throw new InvalidDataException(); }
+        catch (System.Text.Json.JsonException ex) { throw new InvalidDataException("El manifiesto no es JSON válido.", ex); }
         Validate(document);
         return document;
     }
@@ -31,7 +51,7 @@ public sealed class ProjectPackageService(AppPaths paths, AtomicFileWriter write
         lock (gate) return Directory.EnumerateFiles(paths.Projects, "*.atlasled").Select(file =>
         {
             try { var p = Read(file); return new { id = p["id"]!.GetValue<string>(), name = p["name"]!.GetValue<string>(), matrix = p["matrix"]!.DeepClone(), modifiedUtc = p["modifiedUtc"]!.GetValue<string>() }; }
-            catch (InvalidDataException) { return null; }
+            catch (Exception ex) when (ex is InvalidDataException or InvalidOperationException or FormatException or System.Text.Json.JsonException) { return null; }
         }).Where(p => p is not null).OrderByDescending(p => p!.modifiedUtc).Cast<object>().ToArray();
     }
     public JsonObject Save(Guid id, JsonObject document, bool autosave = false)

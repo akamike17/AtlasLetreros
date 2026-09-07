@@ -6,6 +6,7 @@ public sealed class DevicesController(DeviceConnectionService device) : Controll
 {
     [HttpGet("serial")]public object Serial()=>new { ports=device.Ports() };
     [HttpGet("status")]public object Status()=>device.Status;
+    [HttpPost("virtual/connect")]public object ConnectVirtual()=>device.ConnectVirtual();
     public sealed record ConnectRequest(string Port);
     [HttpPost("connect")]public IActionResult Connect(ConnectRequest request)
     {

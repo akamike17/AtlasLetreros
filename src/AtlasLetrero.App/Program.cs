@@ -3,13 +3,23 @@ using AtlasLetrero.App.Services;
 var builder = WebApplication.CreateBuilder(args);
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
-builder.WebHost.UseUrls("http://127.0.0.1:5088");
+builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 8 * 1024 * 1024);
+if (string.IsNullOrWhiteSpace(builder.Configuration["urls"]))
+    builder.WebHost.UseUrls("http://127.0.0.1:5088");
 builder.Services.AddSingleton<AppPaths>();
 builder.Services.AddSingleton<AtomicFileWriter>();
 builder.Services.AddSingleton<ProjectPackageService>();
 builder.Services.AddSingleton<DeviceConnectionService>();
 builder.Services.AddControllers();
 var app = builder.Build();
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    context.Response.Headers["Referrer-Policy"] = "no-referrer";
+    context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
+    context.Response.Headers["Content-Security-Policy"] = "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'";
+    await next();
+});
 app.Use(async (context, next) =>
 {
     try { await next(); }

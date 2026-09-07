@@ -15,6 +15,8 @@ Desde PowerShell, en esta carpeta:
 .\tools\start.ps1
 ```
 
+También puedes abrir `AtlasLetrero.sln` en Visual Studio 2022, seleccionar `AtlasLetrero.App` como proyecto de inicio y pulsar `F5`. El perfil de Visual Studio usa `http://127.0.0.1:5088` y abre el navegador automáticamente. Visual Studio debe tener instalado el SDK de .NET 8; el SDK local `.dotnet` lo utiliza el lanzador de Windows.
+
 La primera compilación puede requerir restaurar paquetes NuGet. El diseño utiliza recursos locales, sin CDN.
 
 ## Archivos de trabajo
