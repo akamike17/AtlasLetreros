@@ -12,6 +12,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: '20.x' }
       - run: npm test
+      - run: dotnet run --project tests/AtlasLetrero.BackendTests/AtlasLetrero.BackendTests.csproj -c Release
       - run: powershell -ExecutionPolicy Bypass -File tools/verify-assets.ps1
       - run: dotnet restore tests/AtlasLetrero.E2E/AtlasLetrero.E2E.csproj
       - run: dotnet build tests/AtlasLetrero.E2E/AtlasLetrero.E2E.csproj -c Release --no-restore

@@ -8,14 +8,14 @@ public sealed class DevicesController(DeviceConnectionService device) : Controll
     [HttpGet("serial")]public object Serial()=>new { ports=device.Ports() };
     [HttpGet("status")]public object Status()=>device.Status;
     [HttpPost("virtual/connect")]public object ConnectVirtual()=>device.ConnectVirtual();
-    [HttpPost("upload"), RequestSizeLimit(DeviceConnectionService.PhysicalPayloadLimit)] public object Upload(JsonObject request)
+    [HttpPost("upload"), RequestSizeLimit(DeviceConnectionService.PhysicalRequestLimit)] public object Upload(JsonObject request)
     {
         var checksum=request["checksum"]?.GetValue<string>() ?? throw new InvalidDataException("Falta checksum.");
         var packet=request["packet"] as JsonObject ?? throw new InvalidDataException("Falta paquete.");
-        var actual=device.Upload(packet,checksum,HttpContext.RequestAborted); return new { checksum=actual, verified=true, activated=false };
+        var actual=device.Upload(packet,checksum,HttpContext.RequestAborted); return new { checksum=actual, candidateId=device.CandidateId, verified=true, activated=false };
     }
     [HttpPost("activate"), RequestSizeLimit(1024)] public object Activate(JsonObject request)
-    { var checksum=request["checksum"]?.GetValue<string>() ?? throw new InvalidDataException("Falta checksum."); return new { checksum=device.Activate(checksum,HttpContext.RequestAborted), activated=true }; }
+    { var candidateId=request["candidateId"]?.GetValue<string>() ?? throw new InvalidDataException("Falta candidato."); return new { checksum=device.Activate(candidateId,HttpContext.RequestAborted), activated=true }; }
     public sealed record ConnectRequest(string Port);
     [HttpPost("connect")]public IActionResult Connect(ConnectRequest request)
     {
