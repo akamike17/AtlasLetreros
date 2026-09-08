@@ -50,8 +50,9 @@ try
     await Button("+ Nuevo proyecto").ClickAsync();
     await page.GetByLabel("Nombre", new() { Exact = true }).FillAsync("SOLUCIONES MG — prueba automática");
     await page.GetByLabel("Ancho (LED)", new() { Exact = true }).FillAsync("96");
+    var editorNavigation = page.WaitForURLAsync("**/editor.html?id=*");
     await Button("Crear").ClickAsync();
-    await page.WaitForURLAsync("**/editor.html?id=*");
+    await editorNavigation;
     var editorUrl = page.Url;
     var id = new Uri(editorUrl).Query.Split('=')[1];
     await Expect(page.Locator("#design-canvas")).ToBeVisibleAsync();
